@@ -94,6 +94,52 @@ class SampleTrack(Track):
         return f"Sample '{self.name}' [{self.sample_path}]: {len(self.patterns)} patterns"
 
 
+class SF2InstrumentTrack(Track):
+    """A SoundFont (SF2) instrument track using sf2player plugin."""
+
+    track_type: Literal["sf2"] = "sf2"
+    sf2_path: str = Field(description="Path to .sf2/.sf3 soundfont file")
+    bank: int = Field(default=0, ge=0, le=999, description="Bank number")
+    patch: int = Field(default=0, ge=0, le=127, description="Patch/program number")
+    gain: float = Field(default=1.0, ge=0.0, le=5.0, description="Gain level")
+    # Reverb settings
+    reverb_on: bool = Field(default=False, description="Enable reverb")
+    reverb_room_size: float = Field(default=0.2, ge=0.0, le=1.0)
+    reverb_damping: float = Field(default=0.0, ge=0.0, le=1.0)
+    reverb_width: float = Field(default=0.5, ge=0.0, le=1.0)
+    reverb_level: float = Field(default=0.9, ge=0.0, le=1.0)
+    # Chorus settings
+    chorus_on: bool = Field(default=False, description="Enable chorus")
+    chorus_num: int = Field(default=3, ge=0, le=10, description="Chorus voices")
+    chorus_level: float = Field(default=2.0, ge=0.0, le=10.0)
+    chorus_speed: float = Field(default=0.3, ge=0.29, le=5.0)
+    chorus_depth: float = Field(default=8.0, ge=0.0, le=46.0)
+
+    def describe(self) -> dict[str, Any]:
+        result = super().describe()
+        result.update({
+            "instrument": "sf2player",
+            "sf2_path": self.sf2_path,
+            "bank": self.bank,
+            "patch": self.patch,
+            "gain": self.gain,
+            "reverb_on": self.reverb_on,
+            "chorus_on": self.chorus_on,
+        })
+        return result
+
+    def to_description(self) -> str:
+        import os
+        sf2_name = os.path.basename(self.sf2_path) if self.sf2_path else "none"
+        effects = []
+        if self.reverb_on:
+            effects.append("reverb")
+        if self.chorus_on:
+            effects.append("chorus")
+        effects_str = f" +{'+'.join(effects)}" if effects else ""
+        return f"SF2 '{self.name}' [{sf2_name} bank:{self.bank} patch:{self.patch}{effects_str}]: {len(self.patterns)} patterns"
+
+
 class AutomationPoint(BaseModel):
     """A single automation point."""
 

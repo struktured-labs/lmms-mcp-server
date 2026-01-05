@@ -8,7 +8,7 @@ from lxml import etree
 from lmms_mcp.models.project import Project
 from lmms_mcp.models.track import (
     InstrumentTrack, SampleTrack, Track, BBTrack, BBInstrument, BBStep,
-    AutomationTrack, AutomationClip, AutomationPoint
+    AutomationTrack, AutomationClip, AutomationPoint, SF2InstrumentTrack
 )
 from lmms_mcp.models.pattern import Pattern
 from lmms_mcp.models.note import Note
@@ -95,26 +95,40 @@ def parse_track(elem: etree._Element) -> Track | None:
         instrument = "tripleoscillator"
         volume = 1.0
         pan = 0.0
+        sf2_data = None
 
         if instrument_elem is not None:
             volume = float(instrument_elem.get("vol", 100)) / 100.0
             pan = float(instrument_elem.get("pan", 0)) / 100.0  # LMMS uses -100 to 100
 
-            # Get instrument plugin name
+            # Get instrument plugin name and check for sf2player
             for child in instrument_elem:
                 if child.tag == "instrument":
                     inst_child = list(child)
                     if inst_child:
                         instrument = inst_child[0].tag
+                        if instrument == "sf2player":
+                            sf2_data = parse_sf2player(inst_child[0])
 
-        track = InstrumentTrack(
-            name=name,
-            instrument=instrument,
-            volume=volume,
-            pan=pan,
-            muted=muted,
-            solo=solo,
-        )
+        # Create SF2 track if sf2player instrument detected
+        if sf2_data is not None:
+            track = SF2InstrumentTrack(
+                name=name,
+                volume=volume,
+                pan=pan,
+                muted=muted,
+                solo=solo,
+                **sf2_data
+            )
+        else:
+            track = InstrumentTrack(
+                name=name,
+                instrument=instrument,
+                volume=volume,
+                pan=pan,
+                muted=muted,
+                solo=solo,
+            )
 
         # Parse patterns
         for pattern_elem in elem.findall("pattern"):
@@ -222,6 +236,31 @@ def parse_automation_clip(elem: etree._Element) -> AutomationClip:
         clip.points.append(point)
 
     return clip
+
+
+def parse_sf2player(elem: etree._Element) -> dict:
+    """Parse sf2player instrument settings.
+
+    Returns dict of SF2InstrumentTrack kwargs.
+    """
+    return {
+        "sf2_path": elem.get("src", ""),
+        "bank": int(elem.get("bank", 0)),
+        "patch": int(elem.get("patch", 0)),
+        "gain": float(elem.get("gain", 1.0)),
+        # Reverb
+        "reverb_on": elem.get("reverbOn", "0") == "1",
+        "reverb_room_size": float(elem.get("reverbRoomSize", 0.2)),
+        "reverb_damping": float(elem.get("reverbDamping", 0.0)),
+        "reverb_width": float(elem.get("reverbWidth", 0.5)),
+        "reverb_level": float(elem.get("reverbLevel", 0.9)),
+        # Chorus
+        "chorus_on": elem.get("chorusOn", "0") == "1",
+        "chorus_num": int(float(elem.get("chorusNum", 3))),
+        "chorus_level": float(elem.get("chorusLevel", 2.0)),
+        "chorus_speed": float(elem.get("chorusSpeed", 0.3)),
+        "chorus_depth": float(elem.get("chorusDepth", 8.0)),
+    }
 
 
 def parse_bb_instrument(elem: etree._Element) -> BBInstrument | None:

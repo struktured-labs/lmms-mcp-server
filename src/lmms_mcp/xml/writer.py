@@ -8,7 +8,7 @@ from lxml import etree
 from lmms_mcp.models.project import Project
 from lmms_mcp.models.track import (
     Track, InstrumentTrack, SampleTrack, BBTrack, BBInstrument,
-    AutomationTrack, AutomationClip
+    AutomationTrack, AutomationClip, SF2InstrumentTrack
 )
 from lmms_mcp.models.pattern import Pattern
 from lmms_mcp.models.note import Note
@@ -153,7 +153,57 @@ def create_track_xml(track: Track) -> etree._Element:
     elem.set("muted", "1" if track.muted else "0")
     elem.set("solo", "1" if track.solo else "0")
 
-    if isinstance(track, InstrumentTrack):
+    if isinstance(track, SF2InstrumentTrack):
+        # SF2 track (must check before InstrumentTrack since it's a subtype)
+        elem.set("type", "0")
+
+        # Instrument track settings
+        inst_track = etree.SubElement(elem, "instrumenttrack")
+        inst_track.set("vol", str(int(track.volume * 100)))
+        inst_track.set("pan", str(int(track.pan * 100)))
+        inst_track.set("pitch", "0")
+        inst_track.set("pitchrange", "1")
+        inst_track.set("fxch", "0")
+        inst_track.set("basenote", "57")
+        inst_track.set("usemasterpitch", "1")
+        inst_track.set("firstkey", "0")
+        inst_track.set("lastkey", "127")
+
+        # SF2 instrument
+        instrument = etree.SubElement(inst_track, "instrument")
+        instrument.set("name", "sf2player")
+        sf2_elem = create_sf2player_xml(track)
+        instrument.append(sf2_elem)
+
+        # Envelope/LFO data
+        eldata = etree.SubElement(inst_track, "eldata")
+        eldata.set("ftype", "0")
+        eldata.set("fcut", "14000")
+        eldata.set("fres", "0.5")
+        eldata.set("fwet", "0")
+
+        # Effects chain
+        fxchain = etree.SubElement(inst_track, "fxchain")
+        fxchain.set("enabled", "0")
+        fxchain.set("numofeffects", "0")
+
+        # MIDI port
+        midiport = etree.SubElement(inst_track, "midiport")
+        midiport.set("readable", "0")
+        midiport.set("writable", "0")
+        midiport.set("inputchannel", "0")
+        midiport.set("outputchannel", "1")
+        midiport.set("basevelocity", "127")
+        midiport.set("fixedinputvelocity", "-1")
+        midiport.set("fixedoutputvelocity", "-1")
+        midiport.set("fixedoutputnote", "-1")
+
+        # Patterns
+        for pattern in track.patterns:
+            pattern_elem = create_pattern_xml(pattern)
+            elem.append(pattern_elem)
+
+    elif isinstance(track, InstrumentTrack):
         elem.set("type", "0")
 
         # Instrument track settings
@@ -359,6 +409,31 @@ def create_audiofileprocessor_xml(src: str = "") -> etree._Element:
     elem.set("reversed", "0")
     elem.set("interp", "1")
     elem.set("stutter", "0")
+    return elem
+
+
+def create_sf2player_xml(track: SF2InstrumentTrack) -> etree._Element:
+    """Create SF2Player (SoundFont) with settings."""
+    elem = etree.Element("sf2player")
+    elem.set("src", track.sf2_path)
+    elem.set("bank", str(track.bank))
+    elem.set("patch", str(track.patch))
+    elem.set("gain", str(track.gain))
+
+    # Reverb settings
+    elem.set("reverbOn", "1" if track.reverb_on else "0")
+    elem.set("reverbRoomSize", str(track.reverb_room_size))
+    elem.set("reverbDamping", str(track.reverb_damping))
+    elem.set("reverbWidth", str(track.reverb_width))
+    elem.set("reverbLevel", str(track.reverb_level))
+
+    # Chorus settings
+    elem.set("chorusOn", "1" if track.chorus_on else "0")
+    elem.set("chorusNum", str(track.chorus_num))
+    elem.set("chorusLevel", str(track.chorus_level))
+    elem.set("chorusSpeed", str(track.chorus_speed))
+    elem.set("chorusDepth", str(track.chorus_depth))
+
     return elem
 
 
