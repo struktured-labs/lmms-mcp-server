@@ -6,7 +6,7 @@ from pathlib import Path
 from lxml import etree
 
 from lmms_mcp.models.project import Project
-from lmms_mcp.models.track import Track, InstrumentTrack, SampleTrack
+from lmms_mcp.models.track import Track, InstrumentTrack, SampleTrack, BBTrack, BBInstrument
 from lmms_mcp.models.pattern import Pattern
 from lmms_mcp.models.note import Note
 
@@ -207,6 +207,36 @@ def create_track_xml(track: Track) -> etree._Element:
         sample_track.set("pan", str(int(track.pan * 100)))
         sample_track.set("src", track.sample_path)
 
+    elif isinstance(track, BBTrack):
+        elem.set("type", "1")  # BB Track type
+
+        bbtrack_elem = etree.SubElement(elem, "bbtrack")
+
+        # BB track container
+        bb_trackcontainer = etree.SubElement(bbtrack_elem, "trackcontainer")
+        bb_trackcontainer.set("type", "bbtrackcontainer")
+        bb_trackcontainer.set("width", "580")
+        bb_trackcontainer.set("height", "300")
+        bb_trackcontainer.set("x", "610")
+        bb_trackcontainer.set("y", "5")
+        bb_trackcontainer.set("maximized", "0")
+        bb_trackcontainer.set("minimized", "0")
+        bb_trackcontainer.set("visible", "1")
+
+        # Add each BB instrument as a track within the BB container
+        for bb_inst in track.instruments:
+            inst_elem = create_bb_instrument_xml(bb_inst, track.num_steps)
+            bb_trackcontainer.append(inst_elem)
+
+        # BB Track Content Object (places BB in song timeline)
+        bbtco = etree.SubElement(elem, "bbtco")
+        bbtco.set("name", track.name)
+        bbtco.set("muted", "1" if track.muted else "0")
+        bbtco.set("pos", str(track.bb_position * TICKS_PER_BAR))
+        bbtco.set("len", str(track.bb_length * TICKS_PER_BAR))
+        bbtco.set("usestyle", "1")
+        bbtco.set("color", "4282417407")
+
     return elem
 
 
@@ -328,4 +358,99 @@ def create_note_xml(note: Note) -> etree._Element:
     # Volume: LMMS uses 0-200, we store 0-127
     elem.set("vol", str(note.velocity))
     elem.set("pan", str(int(note.pan * 100)))
+    return elem
+
+
+def create_bb_instrument_xml(bb_inst: BBInstrument, num_steps: int) -> etree._Element:
+    """Create XML element for a BB instrument (drum row).
+
+    Args:
+        bb_inst: BB instrument to create XML for
+        num_steps: Number of steps in the pattern
+    """
+    elem = etree.Element("track")
+    elem.set("type", "0")  # Instrument track type
+    elem.set("name", bb_inst.name)
+    elem.set("muted", "1" if bb_inst.muted else "0")
+    elem.set("solo", "0")
+
+    # Instrument track settings
+    inst_track = etree.SubElement(elem, "instrumenttrack")
+    inst_track.set("vol", str(int(bb_inst.volume * 100)))
+    inst_track.set("pan", str(int(bb_inst.pan * 100)))
+    inst_track.set("pitch", "0")
+    inst_track.set("pitchrange", "1")
+    inst_track.set("mixch", "0")
+    inst_track.set("basenote", "57")
+    inst_track.set("usemasterpitch", "1")
+
+    # Instrument element with plugin
+    instrument = etree.SubElement(inst_track, "instrument")
+    instrument.set("name", bb_inst.instrument)
+
+    if bb_inst.instrument == "audiofileprocessor":
+        afp = create_audiofileprocessor_xml(bb_inst.sample_path or "")
+        instrument.append(afp)
+    elif bb_inst.instrument == "tripleoscillator":
+        tri = create_tripleoscillator_xml()
+        instrument.append(tri)
+    else:
+        inst_elem = etree.Element(bb_inst.instrument)
+        instrument.append(inst_elem)
+
+    # Envelope/LFO data
+    eldata = etree.SubElement(inst_track, "eldata")
+    eldata.set("ftype", "0")
+    eldata.set("fcut", "14000")
+    eldata.set("fres", "0.5")
+    eldata.set("fwet", "0")
+
+    # Chord creator (disabled)
+    chordcreator = etree.SubElement(inst_track, "chordcreator")
+    chordcreator.set("chord-enabled", "0")
+    chordcreator.set("chord", "0")
+    chordcreator.set("chordrange", "1")
+
+    # Arpeggiator (disabled)
+    arpeggiator = etree.SubElement(inst_track, "arpeggiator")
+    arpeggiator.set("arp-enabled", "0")
+    arpeggiator.set("arp", "0")
+    arpeggiator.set("arpdir", "0")
+    arpeggiator.set("arprange", "1")
+    arpeggiator.set("arpgate", "100")
+
+    # MIDI port
+    midiport = etree.SubElement(inst_track, "midiport")
+    midiport.set("readable", "0")
+    midiport.set("writable", "0")
+    midiport.set("inputchannel", "0")
+    midiport.set("outputchannel", "1")
+    midiport.set("basevelocity", "127")
+
+    # FX chain
+    fxchain = etree.SubElement(inst_track, "fxchain")
+    fxchain.set("enabled", "0")
+    fxchain.set("numofeffects", "0")
+
+    # Pattern with steps
+    pattern = etree.SubElement(elem, "pattern")
+    pattern.set("type", "0")  # Step-based pattern
+    pattern.set("name", bb_inst.name)
+    pattern.set("muted", "0")
+    pattern.set("pos", "0")
+    pattern.set("steps", str(num_steps))
+    pattern.set("len", str(TICKS_PER_BAR))  # 1 bar = 192 ticks
+
+    # Add notes for each active step
+    # In step sequencer, each step is evenly spaced
+    ticks_per_step = TICKS_PER_BAR // num_steps
+    for step in bb_inst.steps:
+        if step.enabled:
+            note_elem = etree.SubElement(pattern, "note")
+            note_elem.set("key", "57")  # A3 (base note for drums)
+            note_elem.set("pos", str(step.step * ticks_per_step))
+            note_elem.set("len", str(ticks_per_step))
+            note_elem.set("vol", str(step.velocity))
+            note_elem.set("pan", "0")
+
     return elem
