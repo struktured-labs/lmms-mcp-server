@@ -6,7 +6,10 @@ from pathlib import Path
 from lxml import etree
 
 from lmms_mcp.models.project import Project
-from lmms_mcp.models.track import InstrumentTrack, SampleTrack, Track, BBTrack, BBInstrument, BBStep
+from lmms_mcp.models.track import (
+    InstrumentTrack, SampleTrack, Track, BBTrack, BBInstrument, BBStep,
+    AutomationTrack, AutomationClip, AutomationPoint
+)
 from lmms_mcp.models.pattern import Pattern
 from lmms_mcp.models.note import Note
 
@@ -163,8 +166,62 @@ def parse_track(elem: etree._Element) -> Track | None:
         )
         return track
 
-    # TODO: Handle other track types (automation, etc.)
+    elif track_type == 5 or track_type == 6:
+        # Automation track (type 5 = hidden, type 6 = visible)
+        auto_track = AutomationTrack(
+            name=name,
+            muted=muted,
+            solo=solo,
+        )
+
+        # Parse automation patterns/clips
+        for pattern_elem in elem.findall("automationpattern"):
+            clip = parse_automation_clip(pattern_elem)
+            auto_track.add_clip(clip)
+
+        return auto_track
+
+    # Unknown track types are skipped
     return None
+
+
+def parse_automation_clip(elem: etree._Element) -> AutomationClip:
+    """Parse an automation clip/pattern element."""
+    name = elem.get("name", "Automation")
+    pos = int(elem.get("pos", 0))
+    length = int(elem.get("len", 192))
+    progression = int(elem.get("prog", 0))
+    tension = float(elem.get("tens", 1.0))
+    muted = elem.get("mute", "0") == "1"
+
+    clip = AutomationClip(
+        name=name,
+        position=pos // TICKS_PER_BAR,
+        length=max(1, length // TICKS_PER_BAR),
+        progression=progression,
+        tension=tension,
+        muted=muted,
+    )
+
+    # Parse automation points
+    for time_elem in elem.findall("time"):
+        time_pos = int(time_elem.get("pos", 0))
+        value = float(time_elem.get("value", 0))
+        out_value_str = time_elem.get("outValue")
+        out_value = float(out_value_str) if out_value_str else None
+        in_tan = float(time_elem.get("inTan", 0))
+        out_tan = float(time_elem.get("outTan", 0))
+
+        point = AutomationPoint(
+            time=time_pos / TICKS_PER_BEAT,
+            value=value,
+            out_value=out_value,
+            in_tan=in_tan,
+            out_tan=out_tan,
+        )
+        clip.points.append(point)
+
+    return clip
 
 
 def parse_bb_instrument(elem: etree._Element) -> BBInstrument | None:

@@ -94,20 +94,84 @@ class SampleTrack(Track):
         return f"Sample '{self.name}' [{self.sample_path}]: {len(self.patterns)} patterns"
 
 
+class AutomationPoint(BaseModel):
+    """A single automation point."""
+
+    time: float = Field(description="Time position in beats")
+    value: float = Field(description="Automation value (0.0-1.0 normalized)")
+    out_value: float | None = Field(default=None, description="Output value (for discrete jumps)")
+    in_tan: float = Field(default=0.0, description="Incoming tangent")
+    out_tan: float = Field(default=0.0, description="Outgoing tangent")
+
+
+class AutomationClip(BaseModel):
+    """An automation clip/pattern."""
+
+    id: int = Field(default=0, description="Clip ID")
+    name: str = Field(default="Automation", description="Clip name")
+    position: int = Field(default=0, description="Start position in bars")
+    length: int = Field(default=4, description="Length in bars")
+    progression: int = Field(default=0, description="0=Discrete, 1=Linear, 2=Cubic")
+    tension: float = Field(default=1.0, ge=0.0, le=1.0, description="Curve tension")
+    muted: bool = Field(default=False, description="Clip muted")
+    points: list[AutomationPoint] = Field(default_factory=list, description="Automation points")
+
+    def add_point(self, time: float, value: float) -> None:
+        """Add an automation point."""
+        # Remove existing point at same time
+        self.points = [p for p in self.points if p.time != time]
+        self.points.append(AutomationPoint(time=time, value=value))
+        self.points.sort(key=lambda p: p.time)
+
+    def clear(self) -> None:
+        """Clear all points."""
+        self.points = []
+
+    def describe(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "position": self.position,
+            "length": self.length,
+            "progression": ["discrete", "linear", "cubic"][min(self.progression, 2)],
+            "tension": self.tension,
+            "point_count": len(self.points),
+        }
+
+
 class AutomationTrack(Track):
     """An automation track."""
 
     track_type: Literal["automation"] = "automation"
-    target_track: int | None = Field(default=None, description="Target track ID")
-    target_param: str | None = Field(default=None, description="Target parameter")
+    clips: list[AutomationClip] = Field(default_factory=list, description="Automation clips")
+
+    def add_clip(self, clip: AutomationClip) -> None:
+        """Add an automation clip."""
+        clip.id = len(self.clips)
+        self.clips.append(clip)
+
+    def get_clip(self, clip_id: int) -> AutomationClip | None:
+        """Get clip by ID."""
+        for clip in self.clips:
+            if clip.id == clip_id:
+                return clip
+        return None
 
     def describe(self) -> dict[str, Any]:
         result = super().describe()
         result.update({
-            "target_track": self.target_track,
-            "target_param": self.target_param,
+            "clip_count": len(self.clips),
+            "clips": [c.describe() for c in self.clips],
         })
         return result
+
+    def to_description(self) -> str:
+        """Human-readable description."""
+        lines = [f"Automation Track '{self.name}': {len(self.clips)} clips"]
+        for clip in self.clips:
+            prog = ["discrete", "linear", "cubic"][min(clip.progression, 2)]
+            lines.append(f"    {clip.name}: {len(clip.points)} points ({prog})")
+        return "\n".join(lines)
 
 
 class BBStep(BaseModel):

@@ -6,7 +6,10 @@ from pathlib import Path
 from lxml import etree
 
 from lmms_mcp.models.project import Project
-from lmms_mcp.models.track import Track, InstrumentTrack, SampleTrack, BBTrack, BBInstrument
+from lmms_mcp.models.track import (
+    Track, InstrumentTrack, SampleTrack, BBTrack, BBInstrument,
+    AutomationTrack, AutomationClip
+)
 from lmms_mcp.models.pattern import Pattern
 from lmms_mcp.models.note import Note
 
@@ -236,6 +239,40 @@ def create_track_xml(track: Track) -> etree._Element:
         bbtco.set("len", str(track.bb_length * TICKS_PER_BAR))
         bbtco.set("usestyle", "1")
         bbtco.set("color", "4282417407")
+
+    elif isinstance(track, AutomationTrack):
+        elem.set("type", "6")  # Automation track type (visible)
+
+        # Automation track element (usually empty)
+        automationtrack = etree.SubElement(elem, "automationtrack")
+
+        # Add automation clips/patterns
+        for clip in track.clips:
+            clip_elem = create_automation_clip_xml(clip)
+            elem.append(clip_elem)
+
+    return elem
+
+
+def create_automation_clip_xml(clip: AutomationClip) -> etree._Element:
+    """Create XML element for an automation clip."""
+    elem = etree.Element("automationpattern")
+    elem.set("name", clip.name)
+    elem.set("pos", str(clip.position * TICKS_PER_BAR))
+    elem.set("len", str(clip.length * TICKS_PER_BAR))
+    elem.set("prog", str(clip.progression))
+    elem.set("tens", str(clip.tension))
+    elem.set("mute", "1" if clip.muted else "0")
+
+    # Add automation points
+    for point in clip.points:
+        time_elem = etree.SubElement(elem, "time")
+        time_elem.set("pos", str(int(point.time * TICKS_PER_BEAT)))
+        time_elem.set("value", str(point.value))
+        if point.out_value is not None:
+            time_elem.set("outValue", str(point.out_value))
+        time_elem.set("inTan", str(point.in_tan))
+        time_elem.set("outTan", str(point.out_tan))
 
     return elem
 
