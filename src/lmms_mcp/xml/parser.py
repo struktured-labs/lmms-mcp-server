@@ -138,12 +138,18 @@ def parse_pattern(elem: etree._Element) -> Pattern:
     """Parse a pattern element."""
     name = elem.get("name", "Pattern")
     pos = int(elem.get("pos", 0))
-    # Convert position from ticks to bars (assuming 192 ticks per beat, 4 beats per bar)
-    position_bars = pos // (192 * 4)
+    pattern_len = int(elem.get("len", 192))
+    pattern_type = int(elem.get("type", 1))  # 0=BeatClip, 1=MelodyClip
+
+    # LMMS uses 192 ticks per bar (in 4/4 time), so 48 ticks per beat
+    ticks_per_bar = 192
+    position_bars = pos // ticks_per_bar
+    length_bars = max(1, pattern_len // ticks_per_bar)
 
     pattern = Pattern(
         name=name,
         position=position_bars,
+        length=length_bars,
     )
 
     # Parse notes
@@ -151,29 +157,30 @@ def parse_pattern(elem: etree._Element) -> Pattern:
         note = parse_note(note_elem)
         pattern.notes.append(note)
 
-    # Calculate pattern length from note positions
-    if pattern.notes:
-        max_end = max(n.start + n.length for n in pattern.notes)
-        pattern.length = max(4, int(max_end / 4) + 1)  # At least 4 bars
-
     return pattern
+
+
+# LMMS tick constants
+TICKS_PER_BAR = 192  # In 4/4 time
+TICKS_PER_BEAT = 48  # 192 / 4 beats
 
 
 def parse_note(elem: etree._Element) -> Note:
     """Parse a note element."""
-    # LMMS stores position and length in ticks (192 ticks per beat)
-    ticks_per_beat = 192.0
-
     pos = int(elem.get("pos", 0))
-    length = int(elem.get("len", 192))
+    length = int(elem.get("len", 48))  # Default to 1 beat
     key = int(elem.get("key", 60))
     vol = int(elem.get("vol", 100))
     pan = int(elem.get("pan", 0))
 
+    # Handle negative length (means full pattern length)
+    if length < 0:
+        length = TICKS_PER_BAR  # Default to 1 bar
+
     return Note(
         pitch=key,
-        start=pos / ticks_per_beat,
-        length=length / ticks_per_beat,
-        velocity=vol,
+        start=pos / TICKS_PER_BEAT,  # Position in beats
+        length=length / TICKS_PER_BEAT,  # Length in beats
+        velocity=min(vol, 127),  # LMMS uses 0-200, clamp to MIDI range
         pan=pan / 100.0,
     )

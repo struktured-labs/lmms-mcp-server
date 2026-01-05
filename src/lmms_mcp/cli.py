@@ -18,7 +18,17 @@ class LMMSCli:
         self.lmms_path = lmms_path or self._find_lmms()
 
     def _find_lmms(self) -> str:
-        """Find LMMS executable in PATH."""
+        """Find LMMS executable in PATH or common locations."""
+        # Check common project-local locations first
+        local_paths = [
+            Path(__file__).parent.parent.parent.parent.parent / "lmms-install" / "bin" / "lmms",
+            Path.home() / "projects" / "lmms-ai" / "lmms-install" / "bin" / "lmms",
+        ]
+        for path in local_paths:
+            if path.exists():
+                return str(path)
+
+        # Fall back to system PATH
         lmms = shutil.which("lmms")
         if lmms is None:
             raise RuntimeError(
