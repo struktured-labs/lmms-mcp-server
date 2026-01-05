@@ -122,9 +122,17 @@ def register(mcp: FastMCP) -> None:
         project = parse_project(filepath)
         cli = LMMSCli()
         render_result = cli.render(filepath, output_path=output_path, format="flac")
-        return {
-            "audio_path": render_result["output_path"],
+
+        result = {
             "description": project.to_description(),
             "summary": project.describe(),
             "render_info": render_result,
         }
+
+        if render_result.get("status") == "success":
+            result["audio_path"] = render_result["output_path"]
+        else:
+            result["audio_path"] = None
+            result["render_error"] = render_result.get("error", "Unknown error")
+
+        return result

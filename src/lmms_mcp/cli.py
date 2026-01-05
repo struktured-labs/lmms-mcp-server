@@ -42,7 +42,8 @@ class LMMSCli:
         output_path: str | None = None,
         format: str = "flac",
         sample_rate: int = 44100,
-        bit_depth: int = 16,
+        use_float: bool = False,
+        bitrate: int = 160,
     ) -> dict[str, Any]:
         """Render a project to audio file.
 
@@ -51,7 +52,8 @@ class LMMSCli:
             output_path: Output audio file path (auto-generated if None)
             format: Output format: flac, wav, ogg, mp3
             sample_rate: Sample rate in Hz (default 44100)
-            bit_depth: Bit depth for output (default 16)
+            use_float: Use 32-bit float (default False = 16-bit int)
+            bitrate: MP3 bitrate in kbit/s (only for mp3, default 160)
 
         Returns:
             Dict with output path and render info
@@ -61,13 +63,20 @@ class LMMSCli:
 
         cmd = [
             self.lmms_path,
-            "-r",  # Render mode
+            "render",
             str(project_path),
             "-o", output_path,
             "-f", format,
             "-s", str(sample_rate),
-            "-b", str(bit_depth),
         ]
+
+        # Add float flag for 32-bit output
+        if use_float:
+            cmd.append("-a")
+
+        # Bitrate only applies to MP3
+        if format == "mp3":
+            cmd.extend(["-b", str(bitrate)])
 
         try:
             result = subprocess.run(
@@ -89,7 +98,7 @@ class LMMSCli:
                 "output_path": output_path,
                 "format": format,
                 "sample_rate": sample_rate,
-                "bit_depth": bit_depth,
+                "use_float": use_float,
             }
 
         except subprocess.TimeoutExpired:
