@@ -6,6 +6,150 @@ from typing import Any, Literal
 from lmms_mcp.models.pattern import Pattern
 
 
+# =============================================================================
+# Effects Models
+# =============================================================================
+
+
+class Effect(BaseModel):
+    """An effect in the FX chain."""
+
+    name: str = Field(description="Effect plugin name")
+    enabled: bool = Field(default=True, description="Effect enabled")
+    wet: float = Field(default=1.0, ge=0.0, le=1.0, description="Wet/dry mix")
+    gate: float = Field(default=0.0, description="Gate threshold")
+    params: dict[str, Any] = Field(default_factory=dict, description="Effect-specific parameters")
+
+    # LADSPA/LV2/VST plugin info
+    plugin_file: str | None = Field(default=None, description="Plugin file (for LADSPA)")
+    plugin_name: str | None = Field(default=None, description="Plugin name within file")
+
+    def describe(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "enabled": self.enabled,
+            "wet": self.wet,
+            "params": self.params,
+            "plugin_file": self.plugin_file,
+            "plugin_name": self.plugin_name,
+        }
+
+
+# Common built-in effects with their default parameters
+BUILTIN_EFFECTS = {
+    "dualfilter": {
+        "cut1": 14000, "res1": 0.5, "gain1": 1.0, "enabled1": 1,
+        "cut2": 14000, "res2": 0.5, "gain2": 1.0, "enabled2": 0,
+        "mix": 0,  # 0=filter1, 1=filter2, 0.5=both
+    },
+    "waveshaper": {
+        "input": 1.0, "output": 1.0, "clip": 0,
+    },
+    "bassbooster": {
+        "freq": 100, "gain": 1.0, "ratio": 2.0,
+    },
+    "delay": {
+        "delay": 200, "feedback": 0.5, "lfotime": 2000, "lfoamt": 0,
+        "outgain": 1.0,
+    },
+    "flanger": {
+        "delay": 3.0, "lfofreq": 0.5, "lfoamt": 0.5, "lfophase": 0.0,
+        "feedback": 0.5, "whitenoise": 0.0, "invertfb": 0,
+    },
+    "reverbsc": {
+        "input": 0.5, "size": 0.8, "color": 0.5, "output": 0.5,
+    },
+    "compressor": {
+        "threshold": -20, "ratio": 4.0, "attack": 10, "release": 100,
+        "knee": 6.0, "makeupgain": 0.0,
+    },
+    "bitcrush": {
+        "indep": 0, "depth": 8, "rate": 44100,
+    },
+    "stereoenhancer": {
+        "width": 0.5,
+    },
+    "amplifier": {
+        "volume": 1.0, "pan": 0.0, "left": 1.0, "right": 1.0,
+    },
+    "eq": {
+        "lowgain": 0.0, "midgain": 0.0, "highgain": 0.0,
+        "lowfreq": 200, "highfreq": 4000,
+    },
+}
+
+
+# =============================================================================
+# Filter Envelope Model (eldata)
+# =============================================================================
+
+
+class FilterLFO(BaseModel):
+    """LFO settings for filter modulation."""
+
+    speed: float = Field(default=0.1, ge=0.0, description="LFO speed")
+    amount: float = Field(default=0.0, ge=0.0, le=100.0, description="LFO amount")
+    shape: int = Field(default=0, ge=0, le=5, description="0=Sine,1=Tri,2=Saw,3=Sqr,4=User,5=Rand")
+    x100: bool = Field(default=False, description="100x speed multiplier")
+    sync_mode: int = Field(default=0, description="Tempo sync mode")
+
+
+class FilterEnvelope(BaseModel):
+    """ADSR envelope for filter."""
+
+    predelay: float = Field(default=0.0, ge=0.0, description="Pre-delay")
+    attack: float = Field(default=0.0, ge=0.0, description="Attack time")
+    hold: float = Field(default=0.5, ge=0.0, description="Hold time")
+    decay: float = Field(default=0.5, ge=0.0, description="Decay time")
+    sustain: float = Field(default=0.5, ge=0.0, le=1.0, description="Sustain level")
+    release: float = Field(default=0.1, ge=0.0, description="Release time")
+    amount: float = Field(default=0.0, description="Envelope amount")
+    lfo: FilterLFO = Field(default_factory=FilterLFO, description="LFO settings")
+
+
+class FilterSettings(BaseModel):
+    """Filter settings (eldata element)."""
+
+    filter_type: int = Field(default=0, ge=0, le=21, description="Filter type")
+    cutoff: float = Field(default=14000, ge=0.0, description="Filter cutoff frequency")
+    resonance: float = Field(default=0.5, ge=0.0, le=1.0, description="Filter resonance")
+    wet: float = Field(default=0.0, ge=0.0, le=1.0, description="Filter wet/dry")
+
+    # Envelopes for volume, cutoff, resonance
+    vol_env: FilterEnvelope = Field(default_factory=FilterEnvelope, description="Volume envelope")
+    cut_env: FilterEnvelope = Field(default_factory=FilterEnvelope, description="Cutoff envelope")
+    res_env: FilterEnvelope = Field(default_factory=FilterEnvelope, description="Resonance envelope")
+
+
+# Filter type constants
+FILTER_TYPES = {
+    "lowpass": 0, "hipass": 1, "bandpass_csg": 2, "bandpass_czpg": 3,
+    "notch": 4, "allpass": 5, "moog": 6, "doublelowpass": 7,
+    "lowpass_rc12": 8, "bandpass_rc12": 9, "highpass_rc12": 10,
+    "lowpass_rc24": 11, "bandpass_rc24": 12, "highpass_rc24": 13,
+    "formant": 14, "doublemoog": 15, "lowpass_sv": 16, "bandpass_sv": 17,
+    "highpass_sv": 18, "notch_sv": 19, "fastformant": 20, "tripole": 21,
+}
+
+
+# =============================================================================
+# Waveform Constants
+# =============================================================================
+
+
+WAVE_SHAPES = {
+    "sine": 0, "triangle": 1, "saw": 2, "square": 3,
+    "moogsaw": 4, "exp": 5, "noise": 6, "user": 7,
+}
+
+
+MODULATION_ALGOS = {
+    "phase": 0, "amplitude": 1, "mix": 2, "sync": 3, "fm": 4,
+    # Aliases
+    "pm": 0, "am": 1,
+}
+
+
 class Track(BaseModel):
     """Base class for LMMS tracks."""
 
@@ -102,6 +246,7 @@ class SF2InstrumentTrack(Track):
     bank: int = Field(default=0, ge=0, le=999, description="Bank number")
     patch: int = Field(default=0, ge=0, le=127, description="Patch/program number")
     gain: float = Field(default=1.0, ge=0.0, le=5.0, description="Gain level")
+    pitch: int = Field(default=0, ge=-24, le=24, description="Track pitch (semitones)")
     # Reverb settings
     reverb_on: bool = Field(default=False, description="Enable reverb")
     reverb_room_size: float = Field(default=0.2, ge=0.0, le=1.0)
@@ -114,6 +259,10 @@ class SF2InstrumentTrack(Track):
     chorus_level: float = Field(default=2.0, ge=0.0, le=10.0)
     chorus_speed: float = Field(default=0.3, ge=0.29, le=5.0)
     chorus_depth: float = Field(default=8.0, ge=0.0, le=46.0)
+    # Filter settings
+    filter: FilterSettings | None = Field(default=None, description="Filter settings")
+    # Effects chain
+    effects: list[Effect] = Field(default_factory=list, description="Effects chain")
 
     def describe(self) -> dict[str, Any]:
         result = super().describe()
@@ -325,3 +474,164 @@ class BBTrack(Track):
         for inst in self.instruments:
             lines.append(f"    {inst.name}: {inst.get_step_string()}")
         return "\n".join(lines)
+
+
+# =============================================================================
+# Synthesizer Track Types
+# =============================================================================
+
+
+class Oscillator(BaseModel):
+    """Single oscillator settings for Triple Oscillator."""
+
+    volume: float = Field(default=100, ge=0, le=200, description="Oscillator volume")
+    pan: float = Field(default=0, ge=-100, le=100, description="Pan position")
+    coarse: int = Field(default=0, ge=-24, le=24, description="Coarse detune (semitones)")
+    fine_left: float = Field(default=0, ge=-100, le=100, description="Fine detune left (cents)")
+    fine_right: float = Field(default=0, ge=-100, le=100, description="Fine detune right (cents)")
+    phase_offset: float = Field(default=0, ge=0, le=360, description="Phase offset (degrees)")
+    stereo_phase: float = Field(default=0, ge=0, le=360, description="Stereo phase detuning")
+    wave_shape: int = Field(default=2, ge=0, le=7, description="Wave shape (0-7)")
+    user_wave: str | None = Field(default=None, description="User wave file path")
+
+
+class TripleOscillatorTrack(Track):
+    """A Triple Oscillator synthesizer track."""
+
+    track_type: Literal["tripleoscillator"] = "tripleoscillator"
+    pitch: int = Field(default=0, ge=-24, le=24, description="Track pitch (semitones)")
+
+    # Three oscillators
+    osc1: Oscillator = Field(default_factory=lambda: Oscillator(wave_shape=2))  # Saw
+    osc2: Oscillator = Field(default_factory=lambda: Oscillator(wave_shape=2, coarse=-12))  # Saw -1oct
+    osc3: Oscillator = Field(default_factory=lambda: Oscillator(wave_shape=3, volume=50))  # Square
+
+    # Modulation algorithms (how osc2/osc3 interact with osc1)
+    mod_algo1: int = Field(default=2, ge=0, le=4, description="Osc1 modulation (2=mix)")
+    mod_algo2: int = Field(default=2, ge=0, le=4, description="Osc2 modulation")
+    mod_algo3: int = Field(default=2, ge=0, le=4, description="Osc3 modulation")
+
+    # Filter settings
+    filter: FilterSettings = Field(default_factory=FilterSettings, description="Filter settings")
+
+    # Effects chain
+    effects: list[Effect] = Field(default_factory=list, description="Effects chain")
+
+    def describe(self) -> dict[str, Any]:
+        result = super().describe()
+        result.update({
+            "instrument": "tripleoscillator",
+            "pitch": self.pitch,
+            "osc1_wave": self.osc1.wave_shape,
+            "osc2_wave": self.osc2.wave_shape,
+            "osc3_wave": self.osc3.wave_shape,
+            "filter_type": self.filter.filter_type,
+            "filter_cutoff": self.filter.cutoff,
+            "effect_count": len(self.effects),
+        })
+        return result
+
+    def to_description(self) -> str:
+        waves = ["sine", "tri", "saw", "sqr", "moog", "exp", "noise", "user"]
+        w1 = waves[min(self.osc1.wave_shape, 7)]
+        w2 = waves[min(self.osc2.wave_shape, 7)]
+        w3 = waves[min(self.osc3.wave_shape, 7)]
+        fx = f" +{len(self.effects)}fx" if self.effects else ""
+        return f"TripleOsc '{self.name}' [{w1}+{w2}+{w3}]{fx}: {len(self.patterns)} patterns"
+
+
+class KickerTrack(Track):
+    """A Kicker synthesizer track for bass drums and sub bass."""
+
+    track_type: Literal["kicker"] = "kicker"
+    pitch: int = Field(default=0, ge=-24, le=24, description="Track pitch (semitones)")
+
+    # Kicker-specific parameters
+    start_freq: float = Field(default=150, ge=5, le=1000, description="Start frequency (Hz)")
+    end_freq: float = Field(default=40, ge=5, le=1000, description="End frequency (Hz)")
+    decay: float = Field(default=300, ge=5, le=5000, description="Decay time (ms)")
+    distortion: float = Field(default=50, ge=0, le=100, description="Distortion amount")
+    dist_end: float = Field(default=50, ge=0, le=100, description="End distortion")
+    gain: float = Field(default=1.0, ge=0.1, le=5.0, description="Output gain")
+    env_slope: float = Field(default=0.5, ge=0.01, le=1.0, description="Envelope slope")
+    noise: float = Field(default=0.0, ge=0.0, le=1.0, description="Noise amount")
+    click: float = Field(default=0.0, ge=0.0, le=1.0, description="Click amount")
+    freq_slope: float = Field(default=0.2, ge=0.001, le=1.0, description="Frequency slope")
+    start_from_note: bool = Field(default=False, description="Start from MIDI note")
+    end_to_note: bool = Field(default=False, description="End to MIDI note")
+
+    # Effects chain
+    effects: list[Effect] = Field(default_factory=list, description="Effects chain")
+
+    def describe(self) -> dict[str, Any]:
+        result = super().describe()
+        result.update({
+            "instrument": "kicker",
+            "start_freq": self.start_freq,
+            "end_freq": self.end_freq,
+            "decay": self.decay,
+            "distortion": self.distortion,
+            "effect_count": len(self.effects),
+        })
+        return result
+
+    def to_description(self) -> str:
+        fx = f" +{len(self.effects)}fx" if self.effects else ""
+        return f"Kicker '{self.name}' [{self.start_freq}→{self.end_freq}Hz, {self.decay}ms]{fx}: {len(self.patterns)} patterns"
+
+
+class MonstroTrack(Track):
+    """A Monstro synthesizer track - powerful modular synth."""
+
+    track_type: Literal["monstro"] = "monstro"
+    pitch: int = Field(default=0, ge=-24, le=24, description="Track pitch (semitones)")
+
+    # Oscillator volumes
+    osc1_vol: float = Field(default=100, ge=0, le=200)
+    osc2_vol: float = Field(default=100, ge=0, le=200)
+    osc3_vol: float = Field(default=100, ge=0, le=200)
+
+    # Oscillator waveforms (Monstro has 15 waveforms)
+    osc1_wave: int = Field(default=4, ge=0, le=14, description="Osc1 wave (square)")
+    osc2_wave: int = Field(default=2, ge=0, le=14, description="Osc2 wave (saw)")
+    osc3_wave1: int = Field(default=0, ge=0, le=14, description="Osc3 wave1")
+    osc3_wave2: int = Field(default=0, ge=0, le=14, description="Osc3 wave2")
+
+    # Oscillator 1 pulse width
+    osc1_pw: float = Field(default=50, ge=0.25, le=75.75, description="Osc1 pulse width")
+
+    # Oscillator 3 sub
+    osc3_sub: float = Field(default=0, ge=-100, le=100, description="Osc3 sub oscillator")
+
+    # LFO 1
+    lfo1_wave: int = Field(default=0, ge=0, le=10, description="LFO1 wave")
+    lfo1_rate: float = Field(default=1.0, ge=0.01, le=20, description="LFO1 rate (Hz)")
+    lfo1_amount: float = Field(default=0, ge=0, le=100, description="LFO1 amount")
+
+    # LFO 2
+    lfo2_wave: int = Field(default=0, ge=0, le=10, description="LFO2 wave")
+    lfo2_rate: float = Field(default=1.0, ge=0.01, le=20, description="LFO2 rate (Hz)")
+    lfo2_amount: float = Field(default=0, ge=0, le=100, description="LFO2 amount")
+
+    # Filter settings
+    filter: FilterSettings = Field(default_factory=FilterSettings, description="Filter settings")
+
+    # Effects chain
+    effects: list[Effect] = Field(default_factory=list, description="Effects chain")
+
+    def describe(self) -> dict[str, Any]:
+        result = super().describe()
+        result.update({
+            "instrument": "monstro",
+            "osc1_wave": self.osc1_wave,
+            "osc2_wave": self.osc2_wave,
+            "lfo1_rate": self.lfo1_rate,
+            "lfo2_rate": self.lfo2_rate,
+            "filter_type": self.filter.filter_type,
+            "effect_count": len(self.effects),
+        })
+        return result
+
+    def to_description(self) -> str:
+        fx = f" +{len(self.effects)}fx" if self.effects else ""
+        return f"Monstro '{self.name}' [LFO1:{self.lfo1_rate}Hz LFO2:{self.lfo2_rate}Hz]{fx}: {len(self.patterns)} patterns"

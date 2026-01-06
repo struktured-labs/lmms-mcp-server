@@ -8,7 +8,9 @@ from lxml import etree
 from lmms_mcp.models.project import Project
 from lmms_mcp.models.track import (
     Track, InstrumentTrack, SampleTrack, BBTrack, BBInstrument,
-    AutomationTrack, AutomationClip, SF2InstrumentTrack
+    AutomationTrack, AutomationClip, SF2InstrumentTrack,
+    TripleOscillatorTrack, KickerTrack, MonstroTrack,
+    Effect, FilterSettings, BUILTIN_EFFECTS,
 )
 from lmms_mcp.models.pattern import Pattern
 from lmms_mcp.models.note import Note
@@ -153,7 +155,34 @@ def create_track_xml(track: Track) -> etree._Element:
     elem.set("muted", "1" if track.muted else "0")
     elem.set("solo", "1" if track.solo else "0")
 
-    if isinstance(track, SF2InstrumentTrack):
+    if isinstance(track, TripleOscillatorTrack):
+        # TripleOscillator synth track
+        elem.set("type", "0")
+        inst_track = create_synth_instrument_track_xml(track, "tripleoscillator")
+        elem.append(inst_track)
+        for pattern in track.patterns:
+            pattern_elem = create_pattern_xml(pattern)
+            elem.append(pattern_elem)
+
+    elif isinstance(track, KickerTrack):
+        # Kicker synth track
+        elem.set("type", "0")
+        inst_track = create_synth_instrument_track_xml(track, "kicker")
+        elem.append(inst_track)
+        for pattern in track.patterns:
+            pattern_elem = create_pattern_xml(pattern)
+            elem.append(pattern_elem)
+
+    elif isinstance(track, MonstroTrack):
+        # Monstro synth track
+        elem.set("type", "0")
+        inst_track = create_synth_instrument_track_xml(track, "monstro")
+        elem.append(inst_track)
+        for pattern in track.patterns:
+            pattern_elem = create_pattern_xml(pattern)
+            elem.append(pattern_elem)
+
+    elif isinstance(track, SF2InstrumentTrack):
         # SF2 track (must check before InstrumentTrack since it's a subtype)
         elem.set("type", "0")
 
@@ -564,5 +593,283 @@ def create_bb_instrument_xml(bb_inst: BBInstrument, num_steps: int) -> etree._El
             note_elem.set("len", str(ticks_per_step))
             note_elem.set("vol", str(step.velocity))
             note_elem.set("pan", "0")
+
+    return elem
+
+
+# =============================================================================
+# Synthesizer and Effects Helper Functions
+# =============================================================================
+
+
+def create_synth_instrument_track_xml(track, instrument_name: str) -> etree._Element:
+    """Create instrumenttrack element for synth tracks."""
+    inst_track = etree.Element("instrumenttrack")
+    inst_track.set("vol", str(int(track.volume * 100)))
+    inst_track.set("pan", str(int(track.pan * 100)))
+    inst_track.set("pitch", str(getattr(track, 'pitch', 0)))
+    inst_track.set("pitchrange", "1")
+    inst_track.set("fxch", "0")
+    inst_track.set("basenote", "57")
+    inst_track.set("usemasterpitch", "1")
+    inst_track.set("firstkey", "0")
+    inst_track.set("lastkey", "127")
+
+    # Instrument element
+    instrument = etree.SubElement(inst_track, "instrument")
+    instrument.set("name", instrument_name)
+
+    # Create specific instrument XML
+    if instrument_name == "tripleoscillator":
+        inst_elem = create_tripleoscillator_from_track(track)
+    elif instrument_name == "kicker":
+        inst_elem = create_kicker_xml(track)
+    elif instrument_name == "monstro":
+        inst_elem = create_monstro_xml(track)
+    else:
+        inst_elem = etree.Element(instrument_name)
+
+    instrument.append(inst_elem)
+
+    # Filter/envelope data (eldata)
+    filter_settings = getattr(track, 'filter', None)
+    if filter_settings:
+        eldata = create_eldata_xml(filter_settings)
+    else:
+        eldata = etree.Element("eldata")
+        eldata.set("ftype", "0")
+        eldata.set("fcut", "14000")
+        eldata.set("fres", "0.5")
+        eldata.set("fwet", "0")
+    inst_track.append(eldata)
+
+    # Effects chain
+    effects = getattr(track, 'effects', [])
+    fxchain = create_fxchain_xml(effects)
+    inst_track.append(fxchain)
+
+    # MIDI port
+    midiport = etree.SubElement(inst_track, "midiport")
+    midiport.set("readable", "0")
+    midiport.set("writable", "0")
+    midiport.set("inputchannel", "0")
+    midiport.set("outputchannel", "1")
+    midiport.set("basevelocity", "127")
+    midiport.set("fixedinputvelocity", "-1")
+    midiport.set("fixedoutputvelocity", "-1")
+    midiport.set("fixedoutputnote", "-1")
+
+    return inst_track
+
+
+def create_eldata_xml(filter_settings: FilterSettings) -> etree._Element:
+    """Create eldata (filter/envelope) XML element."""
+    eldata = etree.Element("eldata")
+    eldata.set("ftype", str(filter_settings.filter_type))
+    eldata.set("fcut", str(filter_settings.cutoff))
+    eldata.set("fres", str(filter_settings.resonance))
+    eldata.set("fwet", str(filter_settings.wet))
+
+    # Volume envelope with LFO
+    elvol = etree.SubElement(eldata, "elvol")
+    _set_envelope_attrs(elvol, filter_settings.vol_env)
+
+    # Cutoff envelope with LFO
+    elcut = etree.SubElement(eldata, "elcut")
+    _set_envelope_attrs(elcut, filter_settings.cut_env)
+
+    # Resonance envelope with LFO
+    elres = etree.SubElement(eldata, "elres")
+    _set_envelope_attrs(elres, filter_settings.res_env)
+
+    return eldata
+
+
+def _set_envelope_attrs(elem: etree._Element, env) -> None:
+    """Set envelope attributes on an element."""
+    elem.set("pdel", str(env.predelay))
+    elem.set("att", str(env.attack))
+    elem.set("hold", str(env.hold))
+    elem.set("dec", str(env.decay))
+    elem.set("sus", str(env.sustain))
+    elem.set("rel", str(env.release))
+    elem.set("amt", str(env.amount))
+
+    # LFO settings
+    elem.set("lspd", str(env.lfo.speed))
+    elem.set("lamt", str(env.lfo.amount))
+    elem.set("lshp", str(env.lfo.shape))
+    elem.set("x100", "1" if env.lfo.x100 else "0")
+    elem.set("syncmode", str(env.lfo.sync_mode))
+    elem.set("ctlenvamt", "0")
+
+
+def create_fxchain_xml(effects: list[Effect]) -> etree._Element:
+    """Create fxchain XML element with effects."""
+    fxchain = etree.Element("fxchain")
+
+    if effects:
+        fxchain.set("enabled", "1")
+        fxchain.set("numofeffects", str(len(effects)))
+
+        for effect in effects:
+            effect_elem = create_effect_xml(effect)
+            fxchain.append(effect_elem)
+    else:
+        fxchain.set("enabled", "0")
+        fxchain.set("numofeffects", "0")
+
+    return fxchain
+
+
+def create_effect_xml(effect: Effect) -> etree._Element:
+    """Create XML element for a single effect."""
+    elem = etree.Element("effect")
+    elem.set("name", effect.name)
+    elem.set("on", "1" if effect.enabled else "0")
+    elem.set("wet", str(effect.wet))
+    elem.set("autoquit", "1")
+    elem.set("autoquit_numerator", "4")
+    elem.set("autoquit_denominator", "4")
+    elem.set("syncmode", "0")
+    elem.set("gate", str(effect.gate))
+
+    # For LADSPA plugins
+    if effect.name == "ladspaeffect" and effect.plugin_file:
+        # LADSPA control container
+        controls = etree.SubElement(elem, "ladspacontrols")
+        controls.set("ports", str(len(effect.params)))
+        for key, value in effect.params.items():
+            controls.set(key, str(value))
+
+        # Plugin key
+        key = etree.SubElement(elem, "key")
+        file_attr = etree.SubElement(key, "attribute")
+        file_attr.set("name", "file")
+        file_attr.set("value", effect.plugin_file)
+        plugin_attr = etree.SubElement(key, "attribute")
+        plugin_attr.set("name", "plugin")
+        plugin_attr.set("value", effect.plugin_name or "")
+    else:
+        # Built-in effect controls
+        controls_name = f"{effect.name}controls"
+        controls = etree.SubElement(elem, controls_name)
+
+        # Get default params and merge with provided params
+        defaults = BUILTIN_EFFECTS.get(effect.name, {})
+        merged_params = {**defaults, **effect.params}
+
+        for key, value in merged_params.items():
+            controls.set(key, str(value))
+
+    return elem
+
+
+def create_tripleoscillator_from_track(track: TripleOscillatorTrack) -> etree._Element:
+    """Create TripleOscillator XML from track settings."""
+    elem = etree.Element("tripleoscillator")
+
+    # Oscillator 1
+    elem.set("vol0", str(track.osc1.volume))
+    elem.set("pan0", str(track.osc1.pan))
+    elem.set("coarse0", str(track.osc1.coarse))
+    elem.set("finel0", str(track.osc1.fine_left))
+    elem.set("finer0", str(track.osc1.fine_right))
+    elem.set("phoffset0", str(track.osc1.phase_offset))
+    elem.set("stphdetun0", str(track.osc1.stereo_phase))
+    elem.set("wavetype0", str(track.osc1.wave_shape))
+    elem.set("userwavefile0", track.osc1.user_wave or "")
+
+    # Oscillator 2
+    elem.set("vol1", str(track.osc2.volume))
+    elem.set("pan1", str(track.osc2.pan))
+    elem.set("coarse1", str(track.osc2.coarse))
+    elem.set("finel1", str(track.osc2.fine_left))
+    elem.set("finer1", str(track.osc2.fine_right))
+    elem.set("phoffset1", str(track.osc2.phase_offset))
+    elem.set("stphdetun1", str(track.osc2.stereo_phase))
+    elem.set("wavetype1", str(track.osc2.wave_shape))
+    elem.set("userwavefile1", track.osc2.user_wave or "")
+
+    # Oscillator 3
+    elem.set("vol2", str(track.osc3.volume))
+    elem.set("pan2", str(track.osc3.pan))
+    elem.set("coarse2", str(track.osc3.coarse))
+    elem.set("finel2", str(track.osc3.fine_left))
+    elem.set("finer2", str(track.osc3.fine_right))
+    elem.set("phoffset2", str(track.osc3.phase_offset))
+    elem.set("stphdetun2", str(track.osc3.stereo_phase))
+    elem.set("wavetype2", str(track.osc3.wave_shape))
+    elem.set("userwavefile2", track.osc3.user_wave or "")
+
+    # Modulation algorithms
+    elem.set("modalgo1", str(track.mod_algo1))
+    elem.set("modalgo2", str(track.mod_algo2))
+    elem.set("modalgo3", str(track.mod_algo3))
+
+    # Wave table mode
+    elem.set("useWaveTable0", "1")
+    elem.set("useWaveTable1", "1")
+    elem.set("useWaveTable2", "1")
+
+    return elem
+
+
+def create_kicker_xml(track: KickerTrack) -> etree._Element:
+    """Create Kicker synthesizer XML."""
+    elem = etree.Element("kicker")
+    elem.set("startfreq", str(track.start_freq))
+    elem.set("endfreq", str(track.end_freq))
+    elem.set("decay", str(track.decay))
+    elem.set("dist", str(track.distortion))
+    elem.set("distend", str(track.dist_end))
+    elem.set("gain", str(track.gain))
+    elem.set("env", str(track.env_slope))
+    elem.set("noise", str(track.noise))
+    elem.set("click", str(track.click))
+    elem.set("slope", str(track.freq_slope))
+    elem.set("startnote", "1" if track.start_from_note else "0")
+    elem.set("endnote", "1" if track.end_to_note else "0")
+    return elem
+
+
+def create_monstro_xml(track: MonstroTrack) -> etree._Element:
+    """Create Monstro synthesizer XML."""
+    elem = etree.Element("monstro")
+
+    # Oscillator volumes
+    elem.set("osc1vol", str(track.osc1_vol))
+    elem.set("osc2vol", str(track.osc2_vol))
+    elem.set("osc3vol", str(track.osc3_vol))
+
+    # Oscillator waveforms
+    elem.set("osc1wave", str(track.osc1_wave))
+    elem.set("osc2wave", str(track.osc2_wave))
+    elem.set("osc3wave1", str(track.osc3_wave1))
+    elem.set("osc3wave2", str(track.osc3_wave2))
+
+    # Oscillator 1 pulse width
+    elem.set("osc1pw", str(track.osc1_pw))
+
+    # Oscillator 3 sub
+    elem.set("osc3sub", str(track.osc3_sub))
+
+    # LFO 1
+    elem.set("lfo1wave", str(track.lfo1_wave))
+    elem.set("lfo1rate", str(track.lfo1_rate))
+    elem.set("lfo1amt", str(track.lfo1_amount))
+
+    # LFO 2
+    elem.set("lfo2wave", str(track.lfo2_wave))
+    elem.set("lfo2rate", str(track.lfo2_rate))
+    elem.set("lfo2amt", str(track.lfo2_amount))
+
+    # Default panning/detuning (can be expanded)
+    elem.set("osc1pan", "0")
+    elem.set("osc2pan", "0")
+    elem.set("osc3pan", "0")
+    elem.set("osc1crs", "0")
+    elem.set("osc2crs", "0")
+    elem.set("osc3crs", "0")
 
     return elem
