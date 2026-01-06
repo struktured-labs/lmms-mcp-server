@@ -190,7 +190,7 @@ def create_track_xml(track: Track) -> etree._Element:
         inst_track = etree.SubElement(elem, "instrumenttrack")
         inst_track.set("vol", str(int(track.volume * 100)))
         inst_track.set("pan", str(int(track.pan * 100)))
-        inst_track.set("pitch", "0")
+        inst_track.set("pitch", str(track.pitch))
         inst_track.set("pitchrange", "1")
         inst_track.set("fxch", "0")
         inst_track.set("basenote", "57")
@@ -204,17 +204,25 @@ def create_track_xml(track: Track) -> etree._Element:
         sf2_elem = create_sf2player_xml(track)
         instrument.append(sf2_elem)
 
-        # Envelope/LFO data
-        eldata = etree.SubElement(inst_track, "eldata")
-        eldata.set("ftype", "0")
-        eldata.set("fcut", "14000")
-        eldata.set("fres", "0.5")
-        eldata.set("fwet", "0")
+        # Envelope/LFO data (filter settings)
+        if track.filter is not None:
+            eldata = create_eldata_xml(track.filter)
+        else:
+            eldata = etree.Element("eldata")
+            eldata.set("ftype", "0")
+            eldata.set("fcut", "14000")
+            eldata.set("fres", "0.5")
+            eldata.set("fwet", "0")
+        inst_track.append(eldata)
 
         # Effects chain
-        fxchain = etree.SubElement(inst_track, "fxchain")
-        fxchain.set("enabled", "0")
-        fxchain.set("numofeffects", "0")
+        if track.effects:
+            fxchain = create_fxchain_xml(track.effects)
+        else:
+            fxchain = etree.Element("fxchain")
+            fxchain.set("enabled", "0")
+            fxchain.set("numofeffects", "0")
+        inst_track.append(fxchain)
 
         # MIDI port
         midiport = etree.SubElement(inst_track, "midiport")
