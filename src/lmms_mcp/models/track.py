@@ -209,6 +209,7 @@ class InstrumentTrack(Track):
     track_type: Literal["instrument"] = "instrument"
     instrument: str = Field(default="tripleoscillator", description="Instrument plugin")
     preset: str | None = Field(default=None, description="Preset name")
+    sample_path: str | None = Field(default=None, description="Sample path for audiofileprocessor")
 
     def describe(self) -> dict[str, Any]:
         result = super().describe()
@@ -216,6 +217,8 @@ class InstrumentTrack(Track):
             "instrument": self.instrument,
             "preset": self.preset,
         })
+        if self.sample_path:
+            result["sample_path"] = self.sample_path
         return result
 
     def to_description(self) -> str:
@@ -257,7 +260,7 @@ class SF2InstrumentTrack(Track):
     chorus_on: bool = Field(default=False, description="Enable chorus")
     chorus_num: int = Field(default=3, ge=0, le=10, description="Chorus voices")
     chorus_level: float = Field(default=2.0, ge=0.0, le=10.0)
-    chorus_speed: float = Field(default=0.3, ge=0.29, le=5.0)
+    chorus_speed: float = Field(default=0.3, ge=0.0, le=5.0)  # relaxed from 0.29 for float precision
     chorus_depth: float = Field(default=8.0, ge=0.0, le=46.0)
     # Filter settings
     filter: FilterSettings | None = Field(default=None, description="Filter settings")

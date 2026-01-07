@@ -258,7 +258,11 @@ def create_track_xml(track: Track) -> etree._Element:
         # Instrument element with plugin
         instrument = etree.SubElement(inst_track, "instrument")
         instrument.set("name", track.instrument)
-        inst_plugin = create_instrument_xml(track.instrument)
+        # Pass sample_path for audiofileprocessor
+        if track.instrument == "audiofileprocessor" and track.sample_path:
+            inst_plugin = create_audiofileprocessor_xml(track.sample_path)
+        else:
+            inst_plugin = create_instrument_xml(track.instrument)
         instrument.append(inst_plugin)
 
         # Envelope/LFO data (basic defaults)

@@ -96,12 +96,13 @@ def parse_track(elem: etree._Element) -> Track | None:
         volume = 1.0
         pan = 0.0
         sf2_data = None
+        sample_path = None  # For audiofileprocessor
 
         if instrument_elem is not None:
             volume = float(instrument_elem.get("vol", 100)) / 100.0
             pan = float(instrument_elem.get("pan", 0)) / 100.0  # LMMS uses -100 to 100
 
-            # Get instrument plugin name and check for sf2player
+            # Get instrument plugin name and check for special instruments
             for child in instrument_elem:
                 if child.tag == "instrument":
                     inst_child = list(child)
@@ -109,6 +110,9 @@ def parse_track(elem: etree._Element) -> Track | None:
                         instrument = inst_child[0].tag
                         if instrument == "sf2player":
                             sf2_data = parse_sf2player(inst_child[0])
+                        elif instrument == "audiofileprocessor":
+                            # Extract sample path for audiofileprocessor
+                            sample_path = inst_child[0].get("src", "")
 
         # Create SF2 track if sf2player instrument detected
         if sf2_data is not None:
@@ -128,6 +132,7 @@ def parse_track(elem: etree._Element) -> Track | None:
                 pan=pan,
                 muted=muted,
                 solo=solo,
+                sample_path=sample_path,  # Store sample path for audiofileprocessor
             )
 
         # Parse patterns
