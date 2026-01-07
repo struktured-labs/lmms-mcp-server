@@ -301,6 +301,11 @@ def create_track_xml(track: Track) -> etree._Element:
         sample_track.set("pan", str(int(track.pan * 100)))
         sample_track.set("src", track.sample_path)
 
+        # Patterns for sample track
+        for pattern in track.patterns:
+            pattern_elem = create_pattern_xml(pattern)
+            elem.append(pattern_elem)
+
     elif isinstance(track, BBTrack):
         elem.set("type", "1")  # BB Track type
 

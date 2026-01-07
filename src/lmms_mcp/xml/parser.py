@@ -173,16 +173,28 @@ def parse_track(elem: etree._Element) -> Track | None:
     elif track_type == 2:
         # Sample track
         sample_path = ""
+        volume = 1.0
+        pan = 0.0
         sampletrack_elem = elem.find("sampletrack")
         if sampletrack_elem is not None:
             sample_path = sampletrack_elem.get("src", "")
+            volume = float(sampletrack_elem.get("vol", 100)) / 100.0
+            pan = float(sampletrack_elem.get("pan", 0)) / 100.0
 
         track = SampleTrack(
             name=name,
             sample_path=sample_path,
+            volume=volume,
+            pan=pan,
             muted=muted,
             solo=solo,
         )
+
+        # Parse patterns for sample track
+        for pattern_elem in elem.findall("pattern"):
+            pattern = parse_pattern(pattern_elem)
+            track.patterns.append(pattern)
+
         return track
 
     elif track_type == 5 or track_type == 6:

@@ -45,10 +45,13 @@ def register(mcp: FastMCP) -> None:
             New track info
         """
         project = parse_project(Path(path))
+        # For audiofileprocessor, preset is the sample path
+        sample_path = preset if instrument == "audiofileprocessor" else None
         track = InstrumentTrack(
             name=name,
             instrument=instrument,
             preset=preset,
+            sample_path=sample_path,
         )
         project.add_track(track)
         write_project(project, Path(path))
