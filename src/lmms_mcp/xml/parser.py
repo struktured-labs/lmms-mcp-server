@@ -252,6 +252,12 @@ def parse_automation_clip(elem: etree._Element) -> AutomationClip:
     tension = float(elem.get("tens", 1.0))
     muted = elem.get("mute", "0") == "1"
 
+    # Parse object link if present
+    object_id = None
+    obj_elem = elem.find("object")
+    if obj_elem is not None:
+        object_id = obj_elem.get("id")
+
     clip = AutomationClip(
         name=name,
         position=pos // TICKS_PER_BAR,
@@ -259,6 +265,7 @@ def parse_automation_clip(elem: etree._Element) -> AutomationClip:
         progression=progression,
         tension=tension,
         muted=muted,
+        object_id=object_id,
     )
 
     # Parse automation points
