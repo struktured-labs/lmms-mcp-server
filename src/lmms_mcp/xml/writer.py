@@ -337,7 +337,7 @@ def create_track_xml(track: Track) -> etree._Element:
         bbtco.set("color", "4282417407")
 
     elif isinstance(track, AutomationTrack):
-        elem.set("type", "6")  # Automation track type (visible)
+        elem.set("type", "5")  # Automation track type (visible, not hidden)
 
         # Automation track element (usually empty)
         automationtrack = etree.SubElement(elem, "automationtrack")

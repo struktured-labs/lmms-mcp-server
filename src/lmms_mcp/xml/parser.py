@@ -225,7 +225,7 @@ def parse_track(elem: etree._Element) -> Track | None:
         return track
 
     elif track_type == 5 or track_type == 6:
-        # Automation track (type 5 = hidden, type 6 = visible)
+        # Automation track (type 5 = Automation (visible), type 6 = HiddenAutomation)
         auto_track = AutomationTrack(
             name=name,
             muted=muted,
