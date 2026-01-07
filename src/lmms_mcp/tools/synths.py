@@ -292,9 +292,9 @@ def register(mcp):
         # Update provided params
         if wave is not None:
             if isinstance(wave, str):
-                osc.wave = WAVE_SHAPES.get(wave.lower(), osc.wave)
+                osc.wave_shape = WAVE_SHAPES.get(wave.lower(), osc.wave_shape)
             else:
-                osc.wave = int(wave)
+                osc.wave_shape = int(wave)
 
         if volume is not None:
             osc.volume = volume
@@ -303,11 +303,11 @@ def register(mcp):
         if coarse is not None:
             osc.coarse = coarse
         if fine_l is not None:
-            osc.fine_l = fine_l
+            osc.fine_left = fine_l
         if fine_r is not None:
-            osc.fine_r = fine_r
+            osc.fine_right = fine_r
         if phase is not None:
-            osc.phase = phase
+            osc.phase_offset = phase
 
         write_project(project, Path(path))
 
@@ -316,13 +316,13 @@ def register(mcp):
             "track_id": track_id,
             "oscillator": osc_num,
             "settings": {
-                "wave": osc.wave,
+                "wave": osc.wave_shape,
                 "volume": osc.volume,
                 "pan": osc.pan,
                 "coarse": osc.coarse,
-                "fine_l": osc.fine_l,
-                "fine_r": osc.fine_r,
-                "phase": osc.phase,
+                "fine_l": osc.fine_left,
+                "fine_r": osc.fine_right,
+                "phase": osc.phase_offset,
             },
         }
 

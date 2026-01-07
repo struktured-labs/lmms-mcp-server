@@ -502,6 +502,7 @@ class TripleOscillatorTrack(Track):
     """A Triple Oscillator synthesizer track."""
 
     track_type: Literal["tripleoscillator"] = "tripleoscillator"
+    instrument: str = Field(default="tripleoscillator", description="Instrument plugin")
     pitch: int = Field(default=0, ge=-24, le=24, description="Track pitch (semitones)")
 
     # Three oscillators

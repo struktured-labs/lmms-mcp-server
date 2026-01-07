@@ -8,7 +8,9 @@ from lxml import etree
 from lmms_mcp.models.project import Project
 from lmms_mcp.models.track import (
     InstrumentTrack, SampleTrack, Track, BBTrack, BBInstrument, BBStep,
-    AutomationTrack, AutomationClip, AutomationPoint, SF2InstrumentTrack
+    AutomationTrack, AutomationClip, AutomationPoint, SF2InstrumentTrack,
+    TripleOscillatorTrack, KickerTrack, MonstroTrack, Oscillator, FilterSettings,
+    FilterLFO, FilterEnvelope, Effect,
 )
 from lmms_mcp.models.pattern import Pattern
 from lmms_mcp.models.note import Note
@@ -98,6 +100,10 @@ def parse_track(elem: etree._Element) -> Track | None:
         sf2_data = None
         sample_path = None  # For audiofileprocessor
 
+        tripleoscillator_data = None
+        filter_settings = None
+        effects = []
+
         if instrument_elem is not None:
             volume = float(instrument_elem.get("vol", 100)) / 100.0
             pan = float(instrument_elem.get("pan", 0)) / 100.0  # LMMS uses -100 to 100
@@ -113,8 +119,14 @@ def parse_track(elem: etree._Element) -> Track | None:
                         elif instrument == "audiofileprocessor":
                             # Extract sample path for audiofileprocessor
                             sample_path = inst_child[0].get("src", "")
+                        elif instrument == "tripleoscillator":
+                            tripleoscillator_data = parse_tripleoscillator(inst_child[0])
+                elif child.tag == "eldata":
+                    filter_settings = parse_eldata(child)
+                elif child.tag == "fxchain":
+                    effects = parse_fxchain(child)
 
-        # Create SF2 track if sf2player instrument detected
+        # Create appropriate track type based on instrument
         if sf2_data is not None:
             track = SF2InstrumentTrack(
                 name=name,
@@ -123,6 +135,21 @@ def parse_track(elem: etree._Element) -> Track | None:
                 muted=muted,
                 solo=solo,
                 **sf2_data
+            )
+        elif tripleoscillator_data is not None:
+            track = TripleOscillatorTrack(
+                name=name,
+                volume=volume,
+                pan=pan,
+                muted=muted,
+                solo=solo,
+                osc1=tripleoscillator_data["osc1"],
+                osc2=tripleoscillator_data["osc2"],
+                osc3=tripleoscillator_data["osc3"],
+                mod_algo1=tripleoscillator_data["mod_algo1"],
+                mod_algo2=tripleoscillator_data["mod_algo2"],
+                filter=filter_settings or FilterSettings(),
+                effects=effects,
             )
         else:
             track = InstrumentTrack(
@@ -376,3 +403,139 @@ def parse_note(elem: etree._Element) -> Note:
         velocity=min(vol, 127),  # LMMS uses 0-200, clamp to MIDI range
         pan=pan / 100.0,
     )
+
+
+def parse_tripleoscillator(elem: etree._Element) -> dict:
+    """Parse tripleoscillator instrument settings."""
+    def get_float(key, default=0.0):
+        return float(elem.get(key, default))
+
+    def get_int(key, default=0):
+        return int(float(elem.get(key, default)))
+
+    return {
+        "osc1": Oscillator(
+            wave_shape=get_int("wavetype0", 2),
+            volume=get_float("vol0", 33),
+            pan=get_float("pan0", 0),
+            coarse=get_int("coarse0", 0),
+            fine_left=get_float("finel0", 0),
+            fine_right=get_float("finer0", 0),
+            phase_offset=get_float("phoffset0", 0),
+            stereo_phase=get_float("stphdetun0", 0),
+        ),
+        "osc2": Oscillator(
+            wave_shape=get_int("wavetype1", 2),
+            volume=get_float("vol1", 33),
+            pan=get_float("pan1", 0),
+            coarse=get_int("coarse1", 0),
+            fine_left=get_float("finel1", 0),
+            fine_right=get_float("finer1", 0),
+            phase_offset=get_float("phoffset1", 0),
+            stereo_phase=get_float("stphdetun1", 0),
+        ),
+        "osc3": Oscillator(
+            wave_shape=get_int("wavetype2", 2),
+            volume=get_float("vol2", 33),
+            pan=get_float("pan2", 0),
+            coarse=get_int("coarse2", -12),
+            fine_left=get_float("finel2", 0),
+            fine_right=get_float("finer2", 0),
+            phase_offset=get_float("phoffset2", 0),
+            stereo_phase=get_float("stphdetun2", 0),
+        ),
+        "mod_algo1": get_int("modalgo1", 2),
+        "mod_algo2": get_int("modalgo2", 2),
+    }
+
+
+def parse_eldata(elem: etree._Element) -> FilterSettings:
+    """Parse eldata (envelope/filter) settings."""
+    def get_float(key, default=0.0):
+        return float(elem.get(key, default))
+
+    def get_int(key, default=0):
+        return int(float(elem.get(key, default)))
+
+    # Parse LFO settings if present
+    lfo = None
+    lfo_predelay = get_float("lfopredelay", 0)
+    lfo_attack = get_float("lfoatt", 0)
+    lfo_speed = get_float("lfospd", 0.1)
+    lfo_amount = get_float("lfoamt", 0)
+    lfo_shape = get_int("lfoshape", 0)
+    lfo_x100 = elem.get("x100") == "1"
+
+    if lfo_amount > 0 or lfo_speed != 0.1:
+        lfo = FilterLFO(
+            predelay=lfo_predelay,
+            attack=lfo_attack,
+            speed=lfo_speed,
+            amount=lfo_amount,
+            shape=lfo_shape,
+            x100=lfo_x100,
+        )
+
+    # Parse envelope settings
+    env = None
+    env_predelay = get_float("elpredelay", 0)
+    env_attack = get_float("elatt", 0)
+    env_hold = get_float("elhold", 0.5)
+    env_decay = get_float("eldec", 0.5)
+    env_sustain = get_float("elsus", 0.5)
+    env_release = get_float("elrel", 0.1)
+    env_amount = get_float("elamt", 0)
+
+    if env_amount > 0:
+        env = FilterEnvelope(
+            predelay=env_predelay,
+            attack=env_attack,
+            hold=env_hold,
+            decay=env_decay,
+            sustain=env_sustain,
+            release=env_release,
+            amount=env_amount,
+        )
+
+    return FilterSettings(
+        filter_type=get_int("ftype", 0),
+        cutoff=get_float("fcut", 14000),
+        resonance=get_float("fres", 0.5),
+        wet=get_float("fwet", 0),
+        lfo=lfo,
+        envelope=env,
+    )
+
+
+def parse_fxchain(elem: etree._Element) -> list[Effect]:
+    """Parse effects chain."""
+    effects = []
+
+    for effect_elem in elem.findall("effect"):
+        name = effect_elem.get("name", "")
+        wet = float(effect_elem.get("wet", 1.0))
+        enabled = effect_elem.get("on", "1") != "0"
+
+        # Parse effect-specific parameters
+        params = {}
+        for child in effect_elem:
+            if child.tag == "ladspaeffect":
+                # LADSPA plugin
+                params["plugin_file"] = child.get("file", "")
+                params["plugin_name"] = child.get("plugin", "")
+            else:
+                # Built-in effect parameters
+                for key, value in child.attrib.items():
+                    try:
+                        params[key] = float(value)
+                    except ValueError:
+                        params[key] = value
+
+        effects.append(Effect(
+            name=name,
+            wet=wet,
+            enabled=enabled,
+            params=params,
+        ))
+
+    return effects
