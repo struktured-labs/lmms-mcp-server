@@ -375,8 +375,10 @@ def create_automation_clip_xml(clip: AutomationClip) -> etree._Element:
         time_elem = etree.SubElement(elem, "time")
         time_elem.set("pos", str(int(point.time * TICKS_PER_BEAT)))
         time_elem.set("value", str(point.value))
-        if point.out_value is not None:
-            time_elem.set("outValue", str(point.out_value))
+        # For smooth automation, outValue should equal value (inValue)
+        # Only set different outValue for discrete jumps
+        out_val = point.out_value if point.out_value is not None else point.value
+        time_elem.set("outValue", str(out_val))
         time_elem.set("inTan", str(point.in_tan))
         time_elem.set("outTan", str(point.out_tan))
 
