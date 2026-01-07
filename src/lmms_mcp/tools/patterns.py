@@ -200,3 +200,91 @@ def register(mcp: FastMCP) -> None:
             "status": "cleared",
             "pattern_id": pattern_id,
         }
+
+    @mcp.tool()
+    def quantize_pattern(
+        path: str,
+        track_id: int,
+        pattern_id: int,
+        grid: float = 0.5,
+        swing: float = 0.0,
+        remove_duplicates: bool = True,
+        trim_to_length: bool = True,
+    ) -> dict[str, Any]:
+        """Quantize notes in a pattern to a grid.
+
+        Args:
+            path: Path to .mmp or .mmpz file
+            track_id: ID of track containing the pattern
+            pattern_id: ID of pattern to quantize
+            grid: Grid size in beats (0.25=16th, 0.5=8th, 1.0=quarter, default 0.5)
+            swing: Swing/groove offset in beats (e.g., 0.03 for slight behind-beat feel)
+            remove_duplicates: Remove notes that land on same grid position (default True)
+            trim_to_length: Remove notes beyond pattern length (default True)
+
+        Returns:
+            Quantization results with before/after note counts
+        """
+        project = parse_project(Path(path))
+        track = project.get_track(track_id)
+        if not track:
+            return {"status": "error", "message": f"Track {track_id} not found"}
+
+        pattern = track.get_pattern(pattern_id)
+        if not pattern:
+            return {"status": "error", "message": f"Pattern {pattern_id} not found"}
+
+        original_count = len(pattern.notes)
+        max_beat = pattern.length * 4  # bars to beats
+
+        # Collect note data
+        notes_data = []
+        for note in pattern.notes:
+            # Quantize to grid
+            quantized_start = round(note.start / grid) * grid
+
+            # Skip if beyond pattern length
+            if trim_to_length and quantized_start >= max_beat:
+                continue
+
+            notes_data.append({
+                "pitch": note.pitch,
+                "start": quantized_start,
+                "length": note.length,
+                "velocity": note.velocity,
+                "pan": note.pan,
+            })
+
+        # Remove duplicates (same pitch on same grid position)
+        if remove_duplicates:
+            seen = set()
+            unique_notes = []
+            for nd in sorted(notes_data, key=lambda x: x["start"]):
+                key = (nd["pitch"], nd["start"])
+                if key not in seen:
+                    seen.add(key)
+                    unique_notes.append(nd)
+            notes_data = unique_notes
+
+        # Clear and rebuild with quantized notes + swing
+        pattern.clear()
+        for nd in notes_data:
+            note = Note(
+                pitch=nd["pitch"],
+                start=nd["start"] + swing,
+                length=nd["length"],
+                velocity=nd["velocity"],
+                pan=nd["pan"],
+            )
+            pattern.add_note(note)
+
+        write_project(project, Path(path))
+        return {
+            "status": "quantized",
+            "grid": grid,
+            "swing": swing,
+            "notes_before": original_count,
+            "notes_after": len(pattern.notes),
+            "removed": original_count - len(pattern.notes),
+            "pattern": pattern.describe(),
+        }
