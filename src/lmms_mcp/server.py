@@ -2,7 +2,7 @@
 
 from mcp.server.fastmcp import FastMCP
 
-from lmms_mcp.tools import project, tracks, patterns, bb, automation, sf2, voice, filters, effects, synths
+from lmms_mcp.tools import project, tracks, patterns, bb, automation, sf2, voice, filters, effects, synths, visualization
 
 # Create FastMCP server
 mcp = FastMCP("lmms-mcp")
@@ -19,6 +19,7 @@ voice.register(mcp)
 filters.register(mcp)
 effects.register(mcp)
 synths.register(mcp)
+visualization.register(mcp)
 
 
 def main():
