@@ -360,6 +360,11 @@ def create_automation_clip_xml(clip: AutomationClip) -> etree._Element:
     elem.set("tens", str(clip.tension))
     elem.set("mute", "1" if clip.muted else "0")
 
+    # Add object link if specified
+    if clip.object_id is not None:
+        obj = etree.SubElement(elem, "object")
+        obj.set("id", clip.object_id)
+
     # Add automation points
     for point in clip.points:
         time_elem = etree.SubElement(elem, "time")

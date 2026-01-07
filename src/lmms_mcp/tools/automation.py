@@ -397,3 +397,62 @@ def register(mcp):
             "status": "cleared",
             "clip": clip.describe(),
         }
+
+    @mcp.tool()
+    def link_automation(
+        path: str,
+        automation_track_id: int,
+        clip_id: int,
+        target_track_id: int,
+        parameter: str,
+    ) -> dict[str, Any]:
+        """Link an automation clip to control a track parameter.
+
+        Common parameters:
+        - "pitch": Track pitch (-24 to +24 semitones)
+        - "vol": Track volume (0-100)
+        - "pan": Track pan (-100 to +100)
+        - "cutoff": Filter cutoff frequency
+        - "reso": Filter resonance
+
+        Args:
+            path: Path to .mmp or .mmpz file
+            automation_track_id: ID of automation track containing the clip
+            clip_id: ID of automation clip to link
+            target_track_id: ID of track to control
+            parameter: Parameter name to automate
+
+        Returns:
+            Link status
+        """
+        project = parse_project(Path(path))
+
+        if automation_track_id >= len(project.tracks):
+            return {"status": "error", "error": f"Automation track {automation_track_id} not found"}
+
+        automation_track = project.tracks[automation_track_id]
+        if not isinstance(automation_track, AutomationTrack):
+            return {"status": "error", "error": f"Track {automation_track_id} is not an automation track"}
+
+        if target_track_id >= len(project.tracks):
+            return {"status": "error", "error": f"Target track {target_track_id} not found"}
+
+        clip = automation_track.get_clip(clip_id)
+        if clip is None:
+            return {"status": "error", "error": f"Clip {clip_id} not found"}
+
+        # Generate unique object ID for the target parameter
+        # Format: trackID/parameter (using track index as pseudo-ID)
+        object_id = f"{target_track_id * 1000000}/{parameter}"
+        clip.object_id = object_id
+
+        write_project(project, Path(path))
+
+        return {
+            "status": "linked",
+            "automation_track": automation_track_id,
+            "clip_id": clip_id,
+            "target_track": target_track_id,
+            "parameter": parameter,
+            "object_id": object_id,
+        }

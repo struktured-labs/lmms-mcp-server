@@ -313,6 +313,7 @@ class AutomationClip(BaseModel):
     tension: float = Field(default=1.0, ge=0.0, le=1.0, description="Curve tension")
     muted: bool = Field(default=False, description="Clip muted")
     points: list[AutomationPoint] = Field(default_factory=list, description="Automation points")
+    object_id: str | None = Field(default=None, description="Object ID to automate (trackN/parameter)")
 
     def add_point(self, time: float, value: float) -> None:
         """Add an automation point."""
