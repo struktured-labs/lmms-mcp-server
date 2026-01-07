@@ -1,5 +1,6 @@
 """Project management tools for LMMS."""
 
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -136,3 +137,64 @@ def register(mcp: FastMCP) -> None:
             result["render_error"] = render_result.get("error", "Unknown error")
 
         return result
+
+    @mcp.tool()
+    def play_audio(
+        path: str,
+        wait: bool = True,
+    ) -> dict[str, Any]:
+        """Play an audio file through the system audio player.
+
+        Args:
+            path: Path to audio file (flac, wav, ogg, mp3)
+            wait: If True, wait for playback to complete (default True)
+
+        Returns:
+            Status of playback
+        """
+        audio_path = Path(path)
+        if not audio_path.exists():
+            return {"status": "error", "message": f"File not found: {path}"}
+
+        # Try different audio players in order of preference
+        players = [
+            ["ffplay", "-nodisp", "-autoexit", str(audio_path)],
+            ["paplay", str(audio_path)],
+            ["aplay", str(audio_path)],
+        ]
+
+        for player_cmd in players:
+            try:
+                if wait:
+                    result = subprocess.run(
+                        player_cmd,
+                        capture_output=True,
+                        timeout=300,  # 5 minute max
+                    )
+                    return {
+                        "status": "played",
+                        "file": str(audio_path),
+                        "player": player_cmd[0],
+                    }
+                else:
+                    subprocess.Popen(
+                        player_cmd,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    return {
+                        "status": "playing",
+                        "file": str(audio_path),
+                        "player": player_cmd[0],
+                    }
+            except FileNotFoundError:
+                continue
+            except subprocess.TimeoutExpired:
+                return {"status": "timeout", "file": str(audio_path)}
+            except Exception as e:
+                continue
+
+        return {
+            "status": "error",
+            "message": "No audio player found (tried ffplay, paplay, aplay)",
+        }
