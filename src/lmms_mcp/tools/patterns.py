@@ -393,3 +393,78 @@ def register(mcp: FastMCP) -> None:
             "notes_copied": copied_count,
             "notes_total": len(pattern.notes),
         }
+
+    @mcp.tool()
+    def transpose_notes(
+        path: str,
+        track_id: int,
+        pattern_id: int,
+        semitones: int | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+        gradual_semitones: int | None = None,
+    ) -> dict[str, Any]:
+        """Transpose notes in a pattern by semitones.
+
+        Can do either a fixed transpose or a gradual pitch drop/rise.
+
+        Args:
+            path: Path to .mmp or .mmpz file
+            track_id: ID of track containing the pattern
+            pattern_id: ID of pattern
+            semitones: Fixed semitone shift (use this OR gradual_semitones)
+            start_time: Start time in beats (default: beginning of pattern)
+            end_time: End time in beats (default: end of pattern)
+            gradual_semitones: Gradual shift from 0 to this value over time range
+
+        Returns:
+            Transposition results
+        """
+        project = parse_project(Path(path))
+
+        if track_id >= len(project.tracks):
+            return {"status": "error", "error": f"Track {track_id} not found"}
+
+        track = project.tracks[track_id]
+
+        if pattern_id >= len(track.patterns):
+            return {"status": "error", "error": f"Pattern {pattern_id} not found"}
+
+        pattern = track.patterns[pattern_id]
+
+        # Determine time range
+        if start_time is None:
+            start_time = 0
+        if end_time is None:
+            end_time = pattern.length * 4  # Convert bars to beats
+
+        modified_count = 0
+
+        for note in pattern.notes:
+            if start_time <= note.start <= end_time:
+                if semitones is not None:
+                    # Fixed transpose
+                    note.pitch += semitones
+                    modified_count += 1
+                elif gradual_semitones is not None:
+                    # Gradual transpose
+                    time_range = end_time - start_time
+                    if time_range > 0:
+                        progress = (note.start - start_time) / time_range
+                        shift = int(progress * gradual_semitones)
+                        note.pitch += shift
+                        modified_count += 1
+
+        write_project(project, Path(path))
+
+        return {
+            "status": "transposed",
+            "track_id": track_id,
+            "pattern_id": pattern_id,
+            "notes_modified": modified_count,
+            "total_notes": len(pattern.notes),
+            "semitones": semitones,
+            "gradual_semitones": gradual_semitones,
+            "start_time": start_time,
+            "end_time": end_time,
+        }
