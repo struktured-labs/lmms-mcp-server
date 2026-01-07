@@ -288,3 +288,108 @@ def register(mcp: FastMCP) -> None:
             "removed": original_count - len(pattern.notes),
             "pattern": pattern.describe(),
         }
+
+    @mcp.tool()
+    def extend_pattern(
+        path: str,
+        track_id: int,
+        pattern_id: int,
+        new_length: int,
+    ) -> dict[str, Any]:
+        """Extend or shrink a pattern to a new length.
+
+        Args:
+            path: Path to .mmp or .mmpz file
+            track_id: ID of track containing the pattern
+            pattern_id: ID of pattern to extend
+            new_length: New length in bars
+
+        Returns:
+            Updated pattern info
+        """
+        project = parse_project(Path(path))
+
+        if track_id >= len(project.tracks):
+            return {"status": "error", "error": f"Track {track_id} not found"}
+
+        track = project.tracks[track_id]
+
+        if pattern_id >= len(track.patterns):
+            return {"status": "error", "error": f"Pattern {pattern_id} not found"}
+
+        pattern = track.patterns[pattern_id]
+        old_length = pattern.length
+        pattern.length = new_length
+
+        write_project(project, Path(path))
+
+        return {
+            "status": "extended",
+            "track_id": track_id,
+            "pattern_id": pattern_id,
+            "old_length": old_length,
+            "new_length": new_length,
+            "note_count": len(pattern.notes),
+        }
+
+    @mcp.tool()
+    def copy_notes(
+        path: str,
+        track_id: int,
+        pattern_id: int,
+        time_offset: float,
+        filter_callback: str | None = None,
+    ) -> dict[str, Any]:
+        """Copy all notes in a pattern with a time offset.
+
+        Useful for duplicating sections. Copies all existing notes and adds
+        them again at start + time_offset.
+
+        Args:
+            path: Path to .mmp or .mmpz file
+            track_id: ID of track containing the pattern
+            pattern_id: ID of pattern
+            time_offset: Time offset in beats to shift copied notes
+            filter_callback: Optional filter (not implemented yet)
+
+        Returns:
+            Copy results
+        """
+        project = parse_project(Path(path))
+
+        if track_id >= len(project.tracks):
+            return {"status": "error", "error": f"Track {track_id} not found"}
+
+        track = project.tracks[track_id]
+
+        if pattern_id >= len(track.patterns):
+            return {"status": "error", "error": f"Pattern {pattern_id} not found"}
+
+        pattern = track.patterns[pattern_id]
+        original_count = len(pattern.notes)
+        original_notes = list(pattern.notes)  # Copy to avoid modifying while iterating
+
+        # Copy each note with offset
+        copied_count = 0
+        for note in original_notes:
+            new_note = Note(
+                pitch=note.pitch,
+                start=note.start + time_offset,
+                length=note.length,
+                velocity=note.velocity,
+                pan=note.pan,
+            )
+            pattern.add_note(new_note)
+            copied_count += 1
+
+        write_project(project, Path(path))
+
+        return {
+            "status": "copied",
+            "track_id": track_id,
+            "pattern_id": pattern_id,
+            "time_offset": time_offset,
+            "notes_original": original_count,
+            "notes_copied": copied_count,
+            "notes_total": len(pattern.notes),
+        }
