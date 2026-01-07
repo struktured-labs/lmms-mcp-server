@@ -445,6 +445,15 @@ def register(mcp):
         clip.trackref = target_track_id
         clip.param = parameter
 
+        # IMPORTANT: Pitch parameter requires semitone-to-cents conversion
+        # LMMS stores pitch in cents (100 cents = 1 semitone)
+        # But users work in semitones, so we convert here
+        if parameter == "pitch":
+            for point in clip.points:
+                point.value *= 100  # Convert semitones to cents
+                if point.out_value is not None:
+                    point.out_value *= 100
+
         write_project(project, Path(path))
 
         return {
@@ -455,4 +464,5 @@ def register(mcp):
             "parameter": parameter,
             "trackref": target_track_id,
             "param": parameter,
+            "note": "Pitch values converted from semitones to cents (x100)" if parameter == "pitch" else None,
         }
