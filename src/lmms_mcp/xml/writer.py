@@ -361,7 +361,12 @@ def create_automation_clip_xml(clip: AutomationClip) -> etree._Element:
     elem.set("mute", "1" if clip.muted else "0")
 
     # Add object link if specified
-    if clip.object_id is not None:
+    # Prefer new trackref/param format over legacy object_id
+    if clip.trackref is not None and clip.param is not None:
+        obj = etree.SubElement(elem, "object")
+        obj.set("trackref", str(clip.trackref))
+        obj.set("param", clip.param)
+    elif clip.object_id is not None:
         obj = etree.SubElement(elem, "object")
         obj.set("id", clip.object_id)
 

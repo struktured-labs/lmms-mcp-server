@@ -441,10 +441,9 @@ def register(mcp):
         if clip is None:
             return {"status": "error", "error": f"Clip {clip_id} not found"}
 
-        # Generate unique object ID for the target parameter
-        # Format: trackID/parameter (using track index as pseudo-ID)
-        object_id = f"{target_track_id * 1000000}/{parameter}"
-        clip.object_id = object_id
+        # Use new trackref/param format (works with modified LMMS)
+        clip.trackref = target_track_id
+        clip.param = parameter
 
         write_project(project, Path(path))
 
@@ -454,5 +453,6 @@ def register(mcp):
             "clip_id": clip_id,
             "target_track": target_track_id,
             "parameter": parameter,
-            "object_id": object_id,
+            "trackref": target_track_id,
+            "param": parameter,
         }

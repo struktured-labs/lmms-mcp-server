@@ -252,11 +252,19 @@ def parse_automation_clip(elem: etree._Element) -> AutomationClip:
     tension = float(elem.get("tens", 1.0))
     muted = elem.get("mute", "0") == "1"
 
-    # Parse object link if present
+    # Parse object link if present (supports both new trackref/param and legacy id format)
     object_id = None
+    trackref = None
+    param = None
     obj_elem = elem.find("object")
     if obj_elem is not None:
-        object_id = obj_elem.get("id")
+        # Try new format first
+        if obj_elem.get("trackref") is not None and obj_elem.get("param") is not None:
+            trackref = int(obj_elem.get("trackref"))
+            param = obj_elem.get("param")
+        # Fall back to legacy format
+        elif obj_elem.get("id") is not None:
+            object_id = obj_elem.get("id")
 
     clip = AutomationClip(
         name=name,
@@ -266,6 +274,8 @@ def parse_automation_clip(elem: etree._Element) -> AutomationClip:
         tension=tension,
         muted=muted,
         object_id=object_id,
+        trackref=trackref,
+        param=param,
     )
 
     # Parse automation points

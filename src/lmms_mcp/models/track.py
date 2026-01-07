@@ -313,7 +313,11 @@ class AutomationClip(BaseModel):
     tension: float = Field(default=1.0, ge=0.0, le=1.0, description="Curve tension")
     muted: bool = Field(default=False, description="Clip muted")
     points: list[AutomationPoint] = Field(default_factory=list, description="Automation points")
-    object_id: str | None = Field(default=None, description="Object ID to automate (trackN/parameter)")
+    # Legacy format (runtime memory addresses - doesn't work for external creation)
+    object_id: str | None = Field(default=None, description="Object ID to automate (legacy format)")
+    # New trackref/param format (works for external creation)
+    trackref: int | None = Field(default=None, description="Track index to automate")
+    param: str | None = Field(default=None, description="Parameter name (pitch, vol, pan)")
 
     def add_point(self, time: float, value: float) -> None:
         """Add an automation point."""
