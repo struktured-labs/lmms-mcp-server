@@ -399,6 +399,60 @@ def register(mcp):
         }
 
     @mcp.tool()
+    def modify_automation_clip(
+        path: str,
+        track_id: int,
+        clip_id: int,
+        length: int | None = None,
+        position: int | None = None,
+        name: str | None = None,
+        progression: int | None = None,
+    ) -> dict[str, Any]:
+        """Modify properties of an existing automation clip.
+
+        Args:
+            path: Path to .mmp or .mmpz file
+            track_id: ID of automation track
+            clip_id: ID of automation clip to modify
+            length: New length in bars (optional)
+            position: New position in bars (optional)
+            name: New name (optional)
+            progression: New progression type: 0=Discrete, 1=Linear, 2=Cubic (optional)
+
+        Returns:
+            Updated clip info
+        """
+        project = parse_project(Path(path))
+
+        if track_id >= len(project.tracks):
+            return {"status": "error", "error": f"Track {track_id} not found"}
+
+        track = project.tracks[track_id]
+        if not isinstance(track, AutomationTrack):
+            return {"status": "error", "error": f"Track {track_id} is not an automation track"}
+
+        clip = track.get_clip(clip_id)
+        if clip is None:
+            return {"status": "error", "error": f"Clip {clip_id} not found"}
+
+        # Update provided properties
+        if length is not None:
+            clip.length = length
+        if position is not None:
+            clip.position = position
+        if name is not None:
+            clip.name = name
+        if progression is not None:
+            clip.progression = progression
+
+        write_project(project, Path(path))
+
+        return {
+            "status": "modified",
+            "clip": clip.describe(),
+        }
+
+    @mcp.tool()
     def link_automation(
         path: str,
         automation_track_id: int,
