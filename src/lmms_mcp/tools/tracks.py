@@ -177,21 +177,24 @@ def register(mcp: FastMCP) -> None:
         Returns:
             Updated track info
         """
+        from lmms_mcp.models.track import AutomationTrack, BBTrack, SampleTrack
+
         project = parse_project(Path(path))
         track = project.get_track(track_id)
         if track:
-            if isinstance(track, InstrumentTrack):
-                track.pitchrange = pitchrange
-                write_project(project, Path(path))
-                return {
-                    "status": "updated",
-                    "track_id": track_id,
-                    "pitchrange": pitchrange,
-                    "track": track.describe(),
-                }
-            else:
+            # Check if track type supports pitch automation
+            if isinstance(track, (AutomationTrack, BBTrack, SampleTrack)):
                 return {
                     "status": "error",
-                    "error": f"Track {track_id} is not an instrument track",
+                    "error": f"Track {track_id} type '{track.track_type}' does not support pitch automation",
                 }
+            # All other track types (InstrumentTrack, TripleOscillatorTrack, SF2InstrumentTrack, etc.) support pitchrange
+            track.pitchrange = pitchrange
+            write_project(project, Path(path))
+            return {
+                "status": "updated",
+                "track_id": track_id,
+                "pitchrange": pitchrange,
+                "track": track.describe(),
+            }
         return {"status": "not_found", "track_id": track_id}
