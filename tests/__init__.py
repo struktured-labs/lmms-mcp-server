@@ -1,1 +1,1 @@
-"""Tests for lmms-mcp."""
+"""LMMS MCP Server Tests."""
