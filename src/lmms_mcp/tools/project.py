@@ -198,3 +198,122 @@ def register(mcp: FastMCP) -> None:
             "status": "error",
             "message": "No audio player found (tried ffplay, paplay, aplay)",
         }
+
+    @mcp.tool()
+    def render_segment(
+        path: str,
+        start_bar: int,
+        end_bar: int | None = None,
+        output_path: str | None = None,
+        play: bool = True,
+    ) -> dict[str, Any]:
+        """Render a specific segment of an LMMS project (useful for long projects).
+
+        This renders the full project and extracts the specified bar range.
+        Useful for testing specific sections without waiting for full renders.
+
+        Args:
+            path: Path to .mmp or .mmpz file
+            start_bar: Starting bar number (0-indexed, bar 0 is the first bar)
+            end_bar: Ending bar number (exclusive, if None renders to end of project)
+            output_path: Output audio file path (auto-generated if None)
+            play: If True, play the segment after rendering (default True)
+
+        Returns:
+            Segment info with audio path and timing details
+        """
+        filepath = Path(path)
+        project = parse_project(filepath)
+
+        # Calculate time positions based on BPM and time signature
+        bpm = project.bpm
+        beats_per_bar = project.time_sig_num
+        seconds_per_beat = 60.0 / bpm
+        seconds_per_bar = seconds_per_beat * beats_per_bar
+
+        start_time = start_bar * seconds_per_bar
+
+        if end_bar is None:
+            duration = None
+            duration_str = "to end"
+        else:
+            end_time = end_bar * seconds_per_bar
+            duration = end_time - start_time
+            duration_str = f"{duration:.2f}s"
+
+        # First, render the full project to a temp file
+        cli = LMMSCli()
+        temp_render_path = filepath.with_suffix(".flac")
+        full_render = cli.render(filepath, output_path=str(temp_render_path), format="flac")
+
+        if full_render.get("status") != "success":
+            return {
+                "status": "error",
+                "error": "Failed to render project",
+                "details": full_render,
+            }
+
+        # Generate output path for segment
+        if output_path is None:
+            segment_name = filepath.stem + f"_bars_{start_bar}-{end_bar if end_bar else 'end'}.flac"
+            output_path = str(filepath.parent / segment_name)
+
+        # Extract segment using ffmpeg
+        ffmpeg_cmd = [
+            "ffmpeg",
+            "-y",  # Overwrite output
+            "-ss", str(start_time),  # Start time
+        ]
+
+        if duration is not None:
+            ffmpeg_cmd.extend(["-t", str(duration)])  # Duration
+
+        ffmpeg_cmd.extend([
+            "-i", str(temp_render_path),  # Input file
+            "-c", "copy",  # Copy codec (no re-encoding)
+            output_path,
+        ])
+
+        try:
+            result = subprocess.run(
+                ffmpeg_cmd,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+
+            if result.returncode != 0:
+                return {
+                    "status": "error",
+                    "error": "Failed to extract segment",
+                    "ffmpeg_error": result.stderr,
+                }
+
+            segment_info = {
+                "status": "success",
+                "output_path": output_path,
+                "start_bar": start_bar,
+                "end_bar": end_bar,
+                "start_time": f"{start_time:.2f}s",
+                "duration": duration_str,
+                "bpm": bpm,
+                "time_signature": f"{project.time_sig_num}/{project.time_sig_den}",
+            }
+
+            # Play the segment if requested
+            if play:
+                play_result = play_audio(output_path, wait=True)
+                segment_info["playback"] = play_result
+
+            return segment_info
+
+        except subprocess.TimeoutExpired:
+            return {
+                "status": "error",
+                "error": "Segment extraction timed out",
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+            }
