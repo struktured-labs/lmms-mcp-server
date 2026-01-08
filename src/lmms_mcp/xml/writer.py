@@ -87,33 +87,76 @@ def create_xml(project: Project) -> etree._Element:
         track_elem = create_track_xml(track)
         trackcontainer.append(track_elem)
 
-    # FX Mixer with master channel
-    fxmixer = etree.SubElement(song, "fxmixer")
-    fxmixer.set("width", "600")
-    fxmixer.set("height", "200")
-    master_channel = etree.SubElement(fxmixer, "mixerchannel")
-    master_channel.set("num", "0")
-    master_channel.set("name", "Master")
-    master_channel.set("volume", "1")
-    master_channel.set("muted", "0")
+    # Mixer with all 64 channels (GUI compatibility)
+    mixer = etree.SubElement(song, "mixer")
+    mixer.set("width", "865")
+    mixer.set("height", "278")
+    mixer.set("x", "5")
+    mixer.set("y", "310")
+    mixer.set("maximized", "0")
+    mixer.set("minimized", "0")
+    mixer.set("visible", "1")
 
-    # Controller rack (empty)
-    controller_rack = etree.SubElement(song, "ControllerRackView")
+    # Create all 64 mixer channels for LMMS GUI compatibility
+    for i in range(64):
+        channel = etree.SubElement(mixer, "mixerchannel")
+        channel.set("num", str(i))
+        channel.set("name", "Master" if i == 0 else f"Channel {i}")
+        channel.set("volume", "1")
+        channel.set("muted", "0")
+        # Add empty fxchain for each channel
+        fxchain = etree.SubElement(channel, "fxchain")
+        fxchain.set("numofeffects", "0")
+        fxchain.set("enabled", "0")
+
+    # Controller rack (empty, with GUI attributes)
+    controller_rack = etree.SubElement(song, "controllerrackview")
     controller_rack.set("width", "350")
     controller_rack.set("height", "200")
+    controller_rack.set("x", "5")
+    controller_rack.set("y", "310")
+    controller_rack.set("maximized", "0")
+    controller_rack.set("minimized", "0")
+    controller_rack.set("visible", "1")
 
-    # Piano roll (empty)
+    # Piano roll (empty, with GUI attributes)
     pianoroll = etree.SubElement(song, "pianoroll")
-    pianoroll.set("width", "600")
+    pianoroll.set("width", "840")
     pianoroll.set("height", "480")
+    pianoroll.set("x", "5")
+    pianoroll.set("y", "5")
+    pianoroll.set("maximized", "0")
+    pianoroll.set("minimized", "0")
+    pianoroll.set("visible", "0")
 
-    # Automation editor
+    # Automation editor (with GUI attributes)
     automationeditor = etree.SubElement(song, "automationeditor")
-    automationeditor.set("width", "600")
-    automationeditor.set("height", "400")
+    automationeditor.set("width", "740")
+    automationeditor.set("height", "480")
+    automationeditor.set("x", "5")
+    automationeditor.set("y", "5")
+    automationeditor.set("maximized", "0")
+    automationeditor.set("minimized", "0")
+    automationeditor.set("visible", "0")
 
-    # Project notes
+    # Project notes (with GUI attributes)
     projectnotes = etree.SubElement(song, "projectnotes")
+    projectnotes.set("width", "400")
+    projectnotes.set("height", "300")
+    projectnotes.set("x", "700")
+    projectnotes.set("y", "10")
+    projectnotes.set("maximized", "0")
+    projectnotes.set("minimized", "0")
+    projectnotes.set("visible", "0")
+
+    # Timeline (GUI compatibility)
+    timeline = etree.SubElement(song, "timeline")
+    timeline.set("lp0pos", "0")
+    timeline.set("lp1pos", "192")
+    timeline.set("lpstate", "0")
+
+    # Controllers (empty, GUI compatibility)
+    controllers = etree.SubElement(song, "controllers")
 
     return root
 
@@ -224,6 +267,25 @@ def create_track_xml(track: Track) -> etree._Element:
             fxchain.set("numofeffects", "0")
         inst_track.append(fxchain)
 
+        # Chord creator (GUI compatibility - disabled by default)
+        chordcreator = etree.SubElement(inst_track, "chordcreator")
+        chordcreator.set("chord", "0")
+        chordcreator.set("chordrange", "1")
+        chordcreator.set("chord-enabled", "0")
+
+        # Arpeggiator (GUI compatibility - disabled by default)
+        arpeggiator = etree.SubElement(inst_track, "arpeggiator")
+        arpeggiator.set("arptime", "100")
+        arpeggiator.set("arprange", "1")
+        arpeggiator.set("arptime_denominator", "4")
+        arpeggiator.set("arptime_numerator", "4")
+        arpeggiator.set("syncmode", "0")
+        arpeggiator.set("arpmode", "0")
+        arpeggiator.set("arp-enabled", "0")
+        arpeggiator.set("arp", "0")
+        arpeggiator.set("arpdir", "0")
+        arpeggiator.set("arpgate", "100")
+
         # MIDI port
         midiport = etree.SubElement(inst_track, "midiport")
         midiport.set("readable", "0")
@@ -276,6 +338,25 @@ def create_track_xml(track: Track) -> etree._Element:
         fxchain = etree.SubElement(inst_track, "fxchain")
         fxchain.set("enabled", "0")
         fxchain.set("numofeffects", "0")
+
+        # Chord creator (GUI compatibility - disabled by default)
+        chordcreator = etree.SubElement(inst_track, "chordcreator")
+        chordcreator.set("chord", "0")
+        chordcreator.set("chordrange", "1")
+        chordcreator.set("chord-enabled", "0")
+
+        # Arpeggiator (GUI compatibility - disabled by default)
+        arpeggiator = etree.SubElement(inst_track, "arpeggiator")
+        arpeggiator.set("arptime", "100")
+        arpeggiator.set("arprange", "1")
+        arpeggiator.set("arptime_denominator", "4")
+        arpeggiator.set("arptime_numerator", "4")
+        arpeggiator.set("syncmode", "0")
+        arpeggiator.set("arpmode", "0")
+        arpeggiator.set("arp-enabled", "0")
+        arpeggiator.set("arp", "0")
+        arpeggiator.set("arpdir", "0")
+        arpeggiator.set("arpgate", "100")
 
         # MIDI port
         midiport = etree.SubElement(inst_track, "midiport")
@@ -501,6 +582,7 @@ def create_pattern_xml(pattern: Pattern) -> etree._Element:
     elem.set("name", pattern.name)
     elem.set("type", "1")  # 1 = MelodyClip (melodic pattern)
     elem.set("muted", "0")
+    elem.set("frozen", "0")  # GUI compatibility
 
     # Position in ticks (192 ticks per bar)
     pos_ticks = pattern.position * TICKS_PER_BAR
@@ -583,10 +665,15 @@ def create_bb_instrument_xml(bb_inst: BBInstrument, num_steps: int) -> etree._El
 
     # Arpeggiator (disabled)
     arpeggiator = etree.SubElement(inst_track, "arpeggiator")
+    arpeggiator.set("arptime", "100")
+    arpeggiator.set("arprange", "1")
+    arpeggiator.set("arptime_denominator", "4")
+    arpeggiator.set("arptime_numerator", "4")
+    arpeggiator.set("syncmode", "0")
+    arpeggiator.set("arpmode", "0")
     arpeggiator.set("arp-enabled", "0")
     arpeggiator.set("arp", "0")
     arpeggiator.set("arpdir", "0")
-    arpeggiator.set("arprange", "1")
     arpeggiator.set("arpgate", "100")
 
     # MIDI port
@@ -677,6 +764,25 @@ def create_synth_instrument_track_xml(track, instrument_name: str) -> etree._Ele
     fxchain = create_fxchain_xml(effects)
     inst_track.append(fxchain)
 
+    # Chord creator (GUI compatibility - disabled by default)
+    chordcreator = etree.SubElement(inst_track, "chordcreator")
+    chordcreator.set("chord", "0")
+    chordcreator.set("chordrange", "1")
+    chordcreator.set("chord-enabled", "0")
+
+    # Arpeggiator (GUI compatibility - disabled by default)
+    arpeggiator = etree.SubElement(inst_track, "arpeggiator")
+    arpeggiator.set("arptime", "100")
+    arpeggiator.set("arprange", "1")
+    arpeggiator.set("arptime_denominator", "4")
+    arpeggiator.set("arptime_numerator", "4")
+    arpeggiator.set("syncmode", "0")
+    arpeggiator.set("arpmode", "0")
+    arpeggiator.set("arp-enabled", "0")
+    arpeggiator.set("arp", "0")
+    arpeggiator.set("arpdir", "0")
+    arpeggiator.set("arpgate", "100")
+
     # MIDI port
     midiport = etree.SubElement(inst_track, "midiport")
     midiport.set("readable", "0")
@@ -715,7 +821,8 @@ def create_eldata_xml(filter_settings: FilterSettings) -> etree._Element:
 
 
 def _set_envelope_attrs(elem: etree._Element, env) -> None:
-    """Set envelope attributes on an element."""
+    """Set envelope attributes on an element (GUI compatibility)."""
+    # ADSR envelope attributes
     elem.set("pdel", str(env.predelay))
     elem.set("att", str(env.attack))
     elem.set("hold", str(env.hold))
@@ -726,11 +833,16 @@ def _set_envelope_attrs(elem: etree._Element, env) -> None:
 
     # LFO settings
     elem.set("lspd", str(env.lfo.speed))
+    elem.set("lspd_numerator", "4")  # GUI compatibility
+    elem.set("lspd_denominator", "4")  # GUI compatibility
     elem.set("lamt", str(env.lfo.amount))
     elem.set("lshp", str(env.lfo.shape))
+    elem.set("lpdel", "0")  # LFO predelay (GUI compatibility)
+    elem.set("latt", "0")  # LFO attack (GUI compatibility)
     elem.set("x100", "1" if env.lfo.x100 else "0")
     elem.set("syncmode", str(env.lfo.sync_mode))
     elem.set("ctlenvamt", "0")
+    elem.set("userwavefile", "")  # GUI compatibility
 
 
 def create_fxchain_xml(effects: list[Effect]) -> etree._Element:
