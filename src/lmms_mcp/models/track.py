@@ -157,6 +157,8 @@ class Track(BaseModel):
     name: str = Field(default="Track", description="Track name")
     volume: float = Field(default=1.0, ge=0.0, description="Track volume")
     pan: float = Field(default=0.0, ge=-1.0, le=1.0, description="Pan position")
+    pitch: int = Field(default=0, description="Pitch offset in semitones")
+    pitchrange: int = Field(default=1, description="Pitch range for automation in semitones")
     muted: bool = Field(default=False, description="Track muted")
     solo: bool = Field(default=False, description="Track solo")
     patterns: list[Pattern] = Field(default_factory=list, description="Patterns on track")

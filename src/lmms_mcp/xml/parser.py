@@ -107,6 +107,8 @@ def parse_track(elem: etree._Element) -> Track | None:
         if instrument_elem is not None:
             volume = float(instrument_elem.get("vol", 100)) / 100.0
             pan = float(instrument_elem.get("pan", 0)) / 100.0  # LMMS uses -100 to 100
+            pitch = int(instrument_elem.get("pitch", 0))
+            pitchrange = int(instrument_elem.get("pitchrange", 1))
 
             # Get instrument plugin name and check for special instruments
             for child in instrument_elem:
@@ -132,6 +134,8 @@ def parse_track(elem: etree._Element) -> Track | None:
                 name=name,
                 volume=volume,
                 pan=pan,
+                pitch=pitch,
+                pitchrange=pitchrange,
                 muted=muted,
                 solo=solo,
                 **sf2_data
@@ -141,6 +145,8 @@ def parse_track(elem: etree._Element) -> Track | None:
                 name=name,
                 volume=volume,
                 pan=pan,
+                pitch=pitch,
+                pitchrange=pitchrange,
                 muted=muted,
                 solo=solo,
                 osc1=tripleoscillator_data["osc1"],
@@ -157,6 +163,8 @@ def parse_track(elem: etree._Element) -> Track | None:
                 instrument=instrument,
                 volume=volume,
                 pan=pan,
+                pitch=pitch,
+                pitchrange=pitchrange,
                 muted=muted,
                 solo=solo,
                 sample_path=sample_path,  # Store sample path for audiofileprocessor
