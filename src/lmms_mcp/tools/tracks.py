@@ -161,3 +161,37 @@ def register(mcp: FastMCP) -> None:
                 "track": track.describe(),
             }
         return {"status": "not_found", "track_id": track_id}
+
+    @mcp.tool()
+    def set_track_pitchrange(path: str, track_id: int, pitchrange: int) -> dict[str, Any]:
+        """Set the pitch range of an instrument track.
+
+        The pitch range determines how far pitch automation can bend the track.
+        For example, pitchrange=24 allows ±24 semitones (±2 octaves).
+
+        Args:
+            path: Path to .mmp or .mmpz file
+            track_id: ID of track to modify
+            pitchrange: Pitch range in semitones (typically 1-24)
+
+        Returns:
+            Updated track info
+        """
+        project = parse_project(Path(path))
+        track = project.get_track(track_id)
+        if track:
+            if isinstance(track, InstrumentTrack):
+                track.pitchrange = pitchrange
+                write_project(project, Path(path))
+                return {
+                    "status": "updated",
+                    "track_id": track_id,
+                    "pitchrange": pitchrange,
+                    "track": track.describe(),
+                }
+            else:
+                return {
+                    "status": "error",
+                    "error": f"Track {track_id} is not an instrument track",
+                }
+        return {"status": "not_found", "track_id": track_id}
