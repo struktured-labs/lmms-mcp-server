@@ -170,8 +170,8 @@ def parse_track(elem: etree._Element) -> Track | None:
                 sample_path=sample_path,  # Store sample path for audiofileprocessor
             )
 
-        # Parse patterns
-        for pattern_elem in elem.findall("pattern"):
+        # Parse patterns (both <pattern> for LMMS 1.2 and <midiclip> for LMMS 1.3+)
+        for pattern_elem in list(elem.findall("pattern")) + list(elem.findall("midiclip")):
             pattern = parse_pattern(pattern_elem)
             track.patterns.append(pattern)
 
@@ -225,8 +225,8 @@ def parse_track(elem: etree._Element) -> Track | None:
             solo=solo,
         )
 
-        # Parse patterns for sample track
-        for pattern_elem in elem.findall("pattern"):
+        # Parse patterns for sample track (both <pattern> and <midiclip>)
+        for pattern_elem in list(elem.findall("pattern")) + list(elem.findall("midiclip")):
             pattern = parse_pattern(pattern_elem)
             track.patterns.append(pattern)
 
@@ -240,8 +240,8 @@ def parse_track(elem: etree._Element) -> Track | None:
             solo=solo,
         )
 
-        # Parse automation patterns/clips
-        for pattern_elem in elem.findall("automationpattern"):
+        # Parse automation patterns/clips (both <automationpattern> and <automationclip>)
+        for pattern_elem in list(elem.findall("automationpattern")) + list(elem.findall("automationclip")):
             clip = parse_automation_clip(pattern_elem)
             auto_track.add_clip(clip)
 

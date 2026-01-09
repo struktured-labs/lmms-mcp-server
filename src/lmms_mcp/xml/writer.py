@@ -432,14 +432,16 @@ def create_track_xml(track: Track) -> etree._Element:
 
 
 def create_automation_clip_xml(clip: AutomationClip) -> etree._Element:
-    """Create XML element for an automation clip."""
-    elem = etree.Element("automationpattern")
+    """Create XML element for an automation clip (automationclip in LMMS 1.3+)."""
+    elem = etree.Element("automationclip")  # LMMS 1.3+ uses automationclip instead of automationpattern
+    elem.set("prog", str(clip.progression))
+    elem.set("mute", "1" if clip.muted else "0")
     elem.set("name", clip.name)
     elem.set("pos", str(clip.position * TICKS_PER_BAR))
-    elem.set("len", str(clip.length * TICKS_PER_BAR))
-    elem.set("prog", str(clip.progression))
     elem.set("tens", str(clip.tension))
-    elem.set("mute", "1" if clip.muted else "0")
+    elem.set("off", "0")  # LMMS 1.3+ compatibility
+    elem.set("autoresize", "1")  # LMMS 1.3+ compatibility
+    elem.set("len", str(clip.length * TICKS_PER_BAR))
 
     # Add object link if specified
     # Prefer new trackref/param format over legacy object_id
@@ -577,16 +579,19 @@ def create_sf2player_xml(track: SF2InstrumentTrack) -> etree._Element:
 
 
 def create_pattern_xml(pattern: Pattern) -> etree._Element:
-    """Create XML element for a pattern."""
-    elem = etree.Element("pattern")
+    """Create XML element for a pattern (midiclip in LMMS 1.3+)."""
+    elem = etree.Element("midiclip")  # LMMS 1.3+ uses midiclip instead of pattern
+    elem.set("steps", "16")  # GUI compatibility: 16-step pattern grid
     elem.set("name", pattern.name)
-    elem.set("type", "1")  # 1 = MelodyClip (melodic pattern)
-    elem.set("muted", "0")
-    elem.set("frozen", "0")  # GUI compatibility
+    elem.set("off", "0")  # LMMS 1.3+ compatibility
 
     # Position in ticks (192 ticks per bar)
     pos_ticks = pattern.position * TICKS_PER_BAR
     elem.set("pos", str(pos_ticks))
+
+    elem.set("autoresize", "1")  # LMMS 1.3+ compatibility
+    elem.set("muted", "0")
+    elem.set("type", "1")  # 1 = MelodyClip (melodic pattern)
 
     # Length in ticks
     len_ticks = pattern.length * TICKS_PER_BAR
@@ -604,12 +609,12 @@ def create_note_xml(note: Note) -> etree._Element:
     """Create XML element for a note."""
     elem = etree.Element("note")
     elem.set("key", str(note.pitch))
+    elem.set("vol", str(note.velocity))
     # Position and length in ticks (48 ticks per beat)
     elem.set("pos", str(int(note.start * TICKS_PER_BEAT)))
-    elem.set("len", str(int(note.length * TICKS_PER_BEAT)))
-    # Volume: LMMS uses 0-200, we store 0-127
-    elem.set("vol", str(note.velocity))
+    elem.set("type", "0")  # LMMS 1.3+ compatibility: note type
     elem.set("pan", str(int(note.pan * 100)))
+    elem.set("len", str(int(note.length * TICKS_PER_BEAT)))
     return elem
 
 
