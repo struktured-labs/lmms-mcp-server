@@ -57,7 +57,7 @@ def write_project(project: Project, path: Path) -> None:
 def create_xml(project: Project) -> etree._Element:
     """Create XML tree from scratch."""
     root = etree.Element("lmms-project")
-    root.set("version", "1.0")
+    root.set("version", "31")  # Match LMMS UPGRADE_METHODS.size() to skip all upgrades
     root.set("creator", "LMMS")
     root.set("creatorversion", LMMS_VERSION)
     root.set("type", "song")
@@ -165,6 +165,9 @@ def update_xml(project: Project) -> etree._Element:
     """Update existing XML tree with project changes."""
     root = project._raw_xml
 
+    # Ensure version is set to 31 to prevent LMMS upgrades
+    root.set("version", "31")
+
     # Update head
     head = root.find("head")
     if head is not None:
@@ -236,7 +239,7 @@ def create_track_xml(track: Track) -> etree._Element:
         inst_track.set("pitch", str(track.pitch))
         inst_track.set("pitchrange", str(track.pitchrange))
         inst_track.set("fxch", "0")
-        inst_track.set("basenote", "57")
+        inst_track.set("basenote", "57")  # A3 reference note
         inst_track.set("usemasterpitch", "1")
         inst_track.set("firstkey", "0")
         inst_track.set("lastkey", "127")
@@ -312,7 +315,7 @@ def create_track_xml(track: Track) -> etree._Element:
         inst_track.set("pitch", "0")
         inst_track.set("pitchrange", "1")
         inst_track.set("fxch", "0")
-        inst_track.set("basenote", "57")  # A3
+        inst_track.set("basenote", "57")  # A3 reference note  # A3
         inst_track.set("usemasterpitch", "1")
         inst_track.set("firstkey", "0")
         inst_track.set("lastkey", "127")
