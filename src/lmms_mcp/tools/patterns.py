@@ -468,3 +468,89 @@ def register(mcp: FastMCP) -> None:
             "start_time": start_time,
             "end_time": end_time,
         }
+
+    @mcp.tool()
+    def shift_patterns(
+        path: str,
+        bars: int,
+        track_ids: list[int] | None = None,
+    ) -> dict[str, Any]:
+        """Shift all patterns and automation clips forward or backward by N bars.
+
+        Useful for restructuring songs (e.g., adding an intro, moving sections).
+
+        Args:
+            path: Path to .mmp or .mmpz file
+            bars: Number of bars to shift (positive = forward, negative = backward)
+            track_ids: Optional list of track IDs to shift (default: shift all tracks)
+
+        Returns:
+            Info about what was shifted
+        """
+        project = parse_project(Path(path))
+
+        # Calculate shift in ticks (192 ticks per bar in 4/4 time)
+        ticks_per_bar = 192
+        shift_ticks = bars * ticks_per_bar
+
+        patterns_shifted = 0
+        automation_clips_shifted = 0
+        tracks_affected = []
+
+        # Determine which tracks to shift
+        if track_ids is None:
+            # Shift all tracks
+            tracks_to_shift = project.tracks
+        else:
+            # Shift only specified tracks
+            tracks_to_shift = [t for t in project.tracks if t.id in track_ids]
+
+        # Shift patterns on regular tracks
+        for track in tracks_to_shift:
+            track_had_changes = False
+
+            # Shift patterns (midiclips)
+            for pattern in track.patterns:
+                old_pos = pattern.position
+                new_pos = old_pos + bars
+
+                # Don't allow negative positions
+                if new_pos < 0:
+                    return {
+                        "status": "error",
+                        "message": f"Cannot shift pattern to negative position (would be bar {new_pos})"
+                    }
+
+                pattern.position = new_pos
+                patterns_shifted += 1
+                track_had_changes = True
+
+            # Shift automation clips if this is an automation track
+            if hasattr(track, 'clips'):
+                for clip in track.clips:
+                    old_pos = clip.position
+                    new_pos = old_pos + bars
+
+                    if new_pos < 0:
+                        return {
+                            "status": "error",
+                            "message": f"Cannot shift automation clip to negative position (would be bar {new_pos})"
+                        }
+
+                    clip.position = new_pos
+                    automation_clips_shifted += 1
+                    track_had_changes = True
+
+            if track_had_changes:
+                tracks_affected.append({"id": track.id, "name": track.name})
+
+        write_project(project, Path(path))
+
+        return {
+            "status": "shifted",
+            "bars": bars,
+            "patterns_shifted": patterns_shifted,
+            "automation_clips_shifted": automation_clips_shifted,
+            "tracks_affected": tracks_affected,
+            "total_items_shifted": patterns_shifted + automation_clips_shifted,
+        }
