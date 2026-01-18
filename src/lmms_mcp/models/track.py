@@ -16,7 +16,7 @@ class Effect(BaseModel):
 
     name: str = Field(description="Effect plugin name")
     enabled: bool = Field(default=True, description="Effect enabled")
-    wet: float = Field(default=1.0, ge=0.0, le=1.0, description="Wet/dry mix")
+    wet: float = Field(default=1.0, description="Wet/dry mix")
     gate: float = Field(default=0.0, description="Gate threshold")
     params: dict[str, Any] = Field(default_factory=dict, description="Effect-specific parameters")
 
